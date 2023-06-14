@@ -1,7 +1,15 @@
 (defpackage cffi-object
   (:use #:cl #:alexandria)
   (:nicknames #:cobj)
-  (:export #:define-struct-cobject))
+  (:export #:cobject
+           #:cobject-pointer
+           #:define-struct-cobject
+           #:carray
+           #:make-carray
+           #:caref
+           #:carray-dimensions
+           #:carray-displacement
+           #:carray-element-type))
 
 (in-package #:cffi-object)
 
@@ -153,3 +161,103 @@
                   :managed-constructor ',managed-constructor
                   :unmanaged-constructor ',unmanaged-constructor
                   :unmanaged-pointer-accessor ',unmanaged-pointer-accessor)))))))
+
+(defstruct (carray (:include cobject)
+                   (:constructor %make-carray))
+  (dimensions '(0) :type (cons fixnum null))
+  (element-type nil :type symbol))
+
+(defun caref (array &rest subscripts &aux (subscript (first subscripts)))
+  (unless (<= 0 subscript (1- (first (carray-dimensions array))))
+    (error "Index ~D is out of bound." subscript))
+  (multiple-value-bind (definition type)
+      (cobject-class-definition (carray-element-type array))
+    (funcall
+     (cobject-class-definition-reference-constructor definition)
+     :pointer (cffi:mem-aptr (cobject-pointer array) type subscript)
+     :source array)))
+
+(defun (setf caref) (value array &rest subscripts &aux (subscript (first subscripts)))
+  (unless (<= 0 subscript (1- (first (carray-dimensions array))))
+    (error "Index ~D is out of bound." subscript))
+  (multiple-value-bind (definition type)
+      (cobject-class-definition (carray-element-type array))
+    (let* ((element-size (cffi:foreign-type-size type))
+           (pointer (cffi:inc-pointer (cobject-pointer array) (* element-size subscript))))
+      (memcpy pointer (cobject-pointer value) element-size)
+      (funcall
+       (cobject-class-definition-reference-constructor definition)
+       :pointer pointer
+       :source array))))
+
+(defmethod print-object ((array carray) stream)
+  (print-unreadable-object (array stream)
+    (loop :with length := (first (carray-dimensions array))
+          :for i :below length
+          :if (< i 10)
+            :unless (zerop i)
+              :do (format stream " ")
+            :end
+            :and :do (princ (caref array i) stream)
+          :else
+            :return (format stream " ... [~D elements elided]" (- length 10)))))
+
+(defstruct (displaced-carray (:include carray)
+                             (:constructor %make-displaced-carray))
+  (displaced-to 0 :type carray)
+  (displaced-index-offset nil :type fixnum))
+
+(defun carray-displacement (array)
+  (typecase array
+    (displaced-carray
+     (values (displaced-carray-displaced-to array)
+             (displaced-carray-displaced-index-offset array)))
+    (t (values nil nil))))
+
+(defun make-carray (dimensions
+                    &key element-type
+                      initial-element initial-contents
+                      displaced-to
+                      (displaced-index-offset 0))
+  (unless (listp dimensions)
+    (setf dimensions (list dimensions)))
+  (let* ((ctype (car (find element-type *cobject-class-definitions*
+                           :key (compose #'cobject-class-definition-class #'cdr))))
+         (element-size (cffi:foreign-type-size ctype))
+         (total-size (* element-size (reduce #'* dimensions)))
+         (pointer (if displaced-to (cffi:inc-pointer (cobject-pointer displaced-to) (* element-size displaced-index-offset))
+                      (cffi:foreign-alloc :uint8 :count total-size)))
+         (array (if displaced-to
+                    (progn
+                      (assert (<= 0 displaced-index-offset (+ displaced-index-offset (first dimensions)) (first (carray-dimensions displaced-to))))
+                      (assert (eq element-type (carray-element-type displaced-to)))
+                      (%make-displaced-carray :pointer pointer
+                                              :dimensions dimensions
+                                              :element-type element-type
+                                              :displaced-to displaced-to
+                                              :displaced-index-offset displaced-index-offset))
+                    (cobject-attach-finalizer (%make-carray :pointer pointer
+                                                            :dimensions dimensions
+                                                            :element-type element-type)))))
+    (when initial-element
+      (assert (null initial-contents))
+      (assert (null displaced-to))
+      (loop :with src := (cobject-pointer initial-element)
+            :for i :of-type fixnum :below (first dimensions)
+            :do (memcpy (cffi:inc-pointer pointer (* i element-size)) src element-size)))
+    (when initial-contents
+      (assert (null initial-element))
+      (assert (null displaced-to))
+      (etypecase initial-contents
+        (carray
+         (assert (equal dimensions (carray-dimensions initial-contents)))
+         (memcpy pointer (cobject-pointer initial-contents) total-size))
+        (sequence
+         (assert (= (first dimensions) (length initial-contents)))
+         (let ((i 0))
+           (map nil (lambda (object)
+                      (memcpy (cffi:inc-pointer pointer (* i element-size))
+                              (cobject-pointer object) element-size)
+                      (incf i))
+                initial-contents)))))
+    array))
