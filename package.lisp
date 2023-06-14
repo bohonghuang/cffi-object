@@ -196,7 +196,7 @@
           :for i :below length
           :if (< i 10)
             :unless (zerop i)
-              :do (format stream " ")
+              :do (format stream "~%  ")
             :end
             :and :do (princ (caref array i) stream)
           :else
