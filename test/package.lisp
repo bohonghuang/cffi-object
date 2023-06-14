@@ -55,3 +55,44 @@
             (is = 1.0 (camera-2d-zoom cam))
             (camera-2d-offset cam))
      (tg:gc :full t))))
+
+(define-test struct-array :parent suite
+  ((lambda (vec)
+     (is = 3.0 (vector2-x vec))
+     (is = 4.0 (vector2-y vec)))
+   (prog1 (let ((arr1 (make-carray 10 :element-type 'vector2)))
+            (setf (caref arr1 0) (make-vector2 :x 1.0 :y 2.0)
+                  (caref arr1 9) (make-vector2 :x 3.0 :y 4.0))
+            (is = 1.0 (vector2-x (caref arr1 0)))
+            (is = 2.0 (vector2-y (caref arr1 0)))
+            (is = 3.0 (vector2-x (caref arr1 9)))
+            (is = 4.0 (vector2-y (caref arr1 9)))
+            (caref arr1 9))
+     (tg:gc :full t)))
+  (let ((arr2 (make-carray 3 :element-type 'vector2
+                             :initial-element (make-vector2 :x 1.0 :y 2.0))))
+    (loop :for i :below 3
+          :do (is = 1.0 (vector2-x (caref arr2 i)))
+              (is = 2.0 (vector2-y (caref arr2 i)))))
+  (let* ((list3 (list (make-vector2 :x 1.0 :y 2.0)
+                      (make-vector2 :x 3.0 :y 4.0)
+                      (make-vector2 :x 5.0 :y 6.0)))
+         (arr3 (make-carray 3 :element-type 'vector2
+                              :initial-contents list3))
+         (arr4 (make-carray 3 :element-type 'vector2
+                              :initial-contents arr3))
+         (arr5 (make-carray 2 :element-type 'vector2
+                              :displaced-to arr3
+                              :displaced-index-offset 1)))
+    (loop :for i :below 3
+          :do (is = (vector2-x (nth i list3)) (vector2-x (caref arr3 i)))
+              (is = (vector2-y (nth i list3)) (vector2-y (caref arr3 i)))
+              (is = (vector2-x (caref arr3 i)) (vector2-x (caref arr4 i)))
+              (is = (vector2-y (caref arr3 i)) (vector2-y (caref arr4 i)))
+          :when (plusp i)
+            :do (is = (vector2-x (caref arr3 i)) (vector2-x (caref arr5 (1- i))))
+                (incf (vector2-x (caref arr5 (1- i))))
+                (is = (vector2-x (caref arr3 i)) (vector2-x (caref arr5 (1- i))))
+                (is = (vector2-y (caref arr3 i)) (vector2-y (caref arr5 (1- i))))
+                (incf (vector2-y (caref arr3 i)))
+                (is = (vector2-y (caref arr3 i)) (vector2-y (caref arr5 (1- i)))))))
