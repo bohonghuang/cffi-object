@@ -37,7 +37,7 @@
   (shared-from nil :type (or cobject null) :read-only t))
 
 (defstruct cobject-class-definition
-  (class nil :type symbol)
+  (class nil :type (or symbol list))
   (internal-constructor nil :type symbol)
   (slot-accessors nil :type list)
   (copier nil :type symbol)
@@ -212,10 +212,11 @@
                 initial-contents)))))
     array))
 
-(defun make-unmanaged-carray (pointer dimensions element-type)
+(defun make-unmanaged-carray (pointer element-type dimensions)
+  (unless (listp dimensions) (setf dimensions (list dimensions)))
   (%make-carray :pointer pointer :dimensions dimensions :element-type element-type))
 
-(defun make-managed-carray (pointer dimensions element-type)
+(defun make-managed-carray (pointer element-type dimensions)
   (manage-cobject (make-unmanaged-carray pointer dimensions element-type)))
 
 (setf (fdefinition 'unmanage-carray) (fdefinition 'unmanage-cobject))
@@ -247,7 +248,17 @@
                     (clength carray1)))))
 
 (defun find-cobject-class-definition (type)
+  (check-type type cffi::foreign-type)
   (or (assoc-value *cobject-class-definitions* type)
+      (and (typep type 'cffi::foreign-built-in-type)
+           (make-cobject-class-definition
+            :class (ecase type
+                     (#.(cffi::ensure-parsed-base-type :float) 'single-float)
+                     (#.(cffi::ensure-parsed-base-type :double) 'double-float)
+                     (#.(mapcar #'cffi::ensure-parsed-base-type '(:int8 :int16 :int32 :int64))
+                      `(signed-byte ,(* (cffi:foreign-type-size type) 8)))
+                     (#.(mapcar #'cffi::ensure-parsed-base-type '(:uint8 :uint16 :uint32 :uint64))
+                      `(unsigned-byte ,(* (cffi:foreign-type-size type) 8))))))
       (error "Cannot find the CFFI object class for type ~A." (cffi::name type))))
 
 (defmacro define-struct-cobject ((name ctype) &aux (*package* (symbol-package name)))
@@ -282,6 +293,14 @@
                                     (find-cobject-class-definition slot-type))
                                   :shared-from ,instance
                                   :pointer (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)))
+                               (cffi::foreign-array-type
+                                `(%make-carray
+                                  :pointer (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
+                                  :dimensions ',(cffi::dimensions slot-type)
+                                  :element-type ',(cobject-class-definition-class
+                                                   (find-cobject-class-definition
+                                                    (cffi::ensure-parsed-base-type
+                                                     (cffi::element-type slot-type))))))
                                (t `(cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot))))
                           (declaim (inline (setf ,slot-accessor)))
                           (defun (setf ,slot-accessor) (,value ,instance)
@@ -289,6 +308,8 @@
                                (cffi::foreign-struct-type
                                 `(memcpy (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
                                          (cobject-pointer ,value) (cffi:foreign-type-size ',slot-type)))
+                               (cffi::foreign-array-type
+                                `(creplace (,slot-accessor ,instance) ,value))
                                (t `(setf (cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot) ,value))))))
          (declaim (inline ,constructor))
          (defun ,constructor (&key . ,slots)
