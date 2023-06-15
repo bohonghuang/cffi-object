@@ -45,7 +45,7 @@
 
 (defstruct cobject-class-definition
   (class nil :type (or symbol list))
-  (internal-constructor nil :type symbol)
+  (internal-constructor nil :type (or symbol function))
   (slot-accessors nil :type list)
   (copier nil :type symbol)
   (inplace-copier nil :type symbol)
@@ -77,10 +77,55 @@
         (single-float :float)
         (double-float :double))))
 
+(defun cobject-type= (type1 type2)
+  (if (and (listp type1) (listp type2)
+           (member (car type1) '(carray cpointer))
+           (member (car type2) '(carray cpointer)))
+      (progn
+        (unless (eq (first type1) (first type2))
+          (return-from cobject-type= nil))
+        (unless (cobject-type= (second type1) (second type2))
+          (return-from cobject-type= nil))
+        (unless (listp (third type1))
+          (setf (third type1) (list (third type1))))
+        (unless (listp (third type2))
+          (setf (third type2) (list (third type2))))
+        (equal type1 type2))
+      (or (type= type1 type2)
+          (and (symbolp type1) (symbolp type2)
+               (eql (find-class type1 nil) (find-class type2 nil))))))
+
 (defun cobject-class-definition (class)
+  "Get the class definition of a cobject at runtime."
   (if-let ((cons (find class *cobject-class-definitions* :key (compose #'cobject-class-definition-class #'cdr))))
     (values (cdr cons) (car cons))
-    (values nil (or (primitive-type-p class) (error "Undefined CFFI object class ~A." class)))))
+    (if-let ((primitive-type (primitive-type-p class)))
+      (values nil primitive-type)
+      (if (listp class)
+          (symbol-macrolet ((as-array (values (make-cobject-class-definition
+                                               :class class
+                                               :internal-constructor (lambda (&key pointer shared-from)
+                                                                       (%make-carray :pointer pointer
+                                                                                     :shared-from shared-from
+                                                                                     :element-type element-type
+                                                                                     :dimensions dimensions)))
+                                              `(:array ,(nth-value 1 (cobject-class-definition element-type)) . ,dimensions)))
+                            (as-pointer (values (make-cobject-class-definition
+                                                 :class class
+                                                 :internal-constructor (lambda (&key pointer shared-from)
+                                                                         (%make-cpointer :pointer (cffi:mem-ref pointer :pointer)
+                                                                                         :shared-from shared-from
+                                                                                         :element-type element-type)))
+                                                `(:pointer ,(nth-value 1 (cobject-class-definition element-type))))))
+            (destructuring-ecase class
+              ((carray element-type &optional dimensions)
+               (if dimensions
+                   (if (listp dimensions)
+                       (if (every #'integerp dimensions) as-array as-pointer)
+                       (if (integerp dimensions) (progn (setf dimensions (list dimensions)) as-array) as-pointer))
+                   as-pointer))
+              ((cpointer element-type) as-pointer)))
+          (error "Undefined CFFI object class ~A." class)))))
 
 (defun cobject-class-object-size (class)
   (if-let ((type (nth-value 1 (cobject-class-definition class))))
@@ -131,7 +176,7 @@
         (setf (cffi:mem-aref (cobject-pointer cpointer) type subscript) value))))
 
 (defun cpointer-equal (pointer1 pointer2 &optional (count 1))
-  (unless (equal (cpointer-element-type pointer1) (cpointer-element-type pointer2))
+  (unless (cobject-type= (cpointer-element-type pointer1) (cpointer-element-type pointer2))
     (return-from cpointer-equal nil))
   (zerop (memcmp (cobject-pointer pointer1)
                  (cobject-pointer pointer2)
@@ -207,7 +252,7 @@
          (array (if displaced-to
                     (progn
                       (assert (<= 0 displaced-index-offset (+ displaced-index-offset (first dimensions)) (first (carray-dimensions displaced-to))))
-                      (assert (equal element-type (carray-element-type displaced-to)))
+                      (assert (cobject-type= element-type (carray-element-type displaced-to)))
                       (%make-displaced-carray :pointer pointer
                                               :dimensions dimensions
                                               :element-type element-type
@@ -259,7 +304,7 @@
                  &key
                    (start1 0) (end1 (clength target-carray1))
                    (start2 0) (end2 (clength source-carray2)))
-  (assert (equal (carray-element-type target-carray1) (carray-element-type source-carray2)))
+  (assert (cobject-type= (carray-element-type target-carray1) (carray-element-type source-carray2)))
   (assert (<= 0 (- end2 start2) (- end1 start1)))
   (let ((element-size (cobject-class-object-size (carray-element-type target-carray1))))
     (memcpy (cffi:inc-pointer (cobject-pointer target-carray1) (* start1 element-size))
@@ -276,17 +321,26 @@
   (cpointer-equal array1 array2 (clength array1)))
 
 (defun find-cobject-class-definition (type)
+  "Get the class definition of a cobject at compile-time."
   (check-type type cffi::foreign-type)
   (or (assoc-value *cobject-class-definitions* type)
       (and (typep type 'cffi::foreign-built-in-type)
            (make-cobject-class-definition
-            :class (ecase type
+            :class (case type
                      (#.(cffi::ensure-parsed-base-type :float) 'single-float)
                      (#.(cffi::ensure-parsed-base-type :double) 'double-float)
                      (#.(mapcar #'cffi::ensure-parsed-base-type '(:int8 :int16 :int32 :int64))
                       `(signed-byte ,(* (cffi:foreign-type-size type) 8)))
                      (#.(mapcar #'cffi::ensure-parsed-base-type '(:uint8 :uint16 :uint32 :uint64))
-                      `(unsigned-byte ,(* (cffi:foreign-type-size type) 8))))))
+                      `(unsigned-byte ,(* (cffi:foreign-type-size type) 8)))
+                     (t (etypecase type
+                          (cffi::foreign-array-type
+                           `(carray ,(cobject-class-definition-class
+                                      (find-cobject-class-definition (cffi::element-type type)))
+                                    ,(cffi::dimensions type)))
+                          (cffi::foreign-pointer-type
+                           `(cpointer ,(cobject-class-definition-class
+                                        (find-cobject-class-definition (cffi::pointer-type type))))))))))
       (error "Cannot find the CFFI object class for type ~A." (cffi::name type))))
 
 (defmacro define-struct-cobject ((name ctype) &aux (*package* (symbol-package name)))
