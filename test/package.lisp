@@ -109,7 +109,7 @@
       (is = 3.0 (vector2-x (caref arr6 2)))
       (is = 4.0 (vector2-y (caref arr6 2))))))
 
-(define-test primitive-array :parent suite
+(define-test primitive-type-array :parent suite
   (let ((arr1 (make-carray 3 :element-type '(unsigned-byte 32))))
     (cfill arr1 1)
     (creplace arr1 (make-carray 3 :element-type '(unsigned-byte 32)
@@ -124,3 +124,56 @@
       (is carray-equal arr1 arr2)
       (setf (caref arr2 0) 0)
       (isnt carray-equal arr1 arr2))))
+
+(defcstruct sockaddr
+  (sa-family :ushort)
+  (sa-data (:array :char 14)))
+
+(define-struct-cobject (sockaddr (:struct sockaddr)))
+
+(define-test primitive-type-array-in-struct :parent suite
+  (let ((sockaddr (make-sockaddr))
+        (port (make-carray 1 :element-type '(unsigned-byte 16)
+                             :initial-element 8080))
+        (addr (make-carray 4 :element-type '(unsigned-byte 8)
+                             :initial-contents #(192 168 31 1))))
+    (creplace (sockaddr-sa-data sockaddr)
+              (print (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2))
+              :start1 0)
+    (creplace (sockaddr-sa-data sockaddr)
+              (print (make-unmanaged-carray (cobject-pointer addr) '(signed-byte 8) 4))
+              :start1 2)
+    (is carray-equal
+        (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2)
+        (make-carray 2 :element-type '(signed-byte 8)
+                       :displaced-to (sockaddr-sa-data sockaddr)
+                       :displaced-index-offset 0))
+    (loop :with addr := (make-unmanaged-carray (cobject-pointer addr) '(signed-byte 8) 4)
+          :for i :below 4
+          :for j :from 2
+          :do (is = (caref addr i) (caref (sockaddr-sa-data sockaddr) j)))))
+
+(defcstruct sample
+  (left :float)
+  (right :float))
+
+(define-struct-cobject (sample (:struct sample)))
+
+(defcstruct sample-ring-buffer
+  (data (:array (:struct sample) 2048))
+  (free-position :size)
+  (data-position :size)
+  (free-count :size)
+  (data-count :size))
+
+(define-struct-cobject (sample-ring-buffer (:struct sample-ring-buffer)))
+
+(define-test object-array-in-struct :parent suite
+  (loop :with ring-buffer := (make-sample-ring-buffer)
+        :with sample-buffer := (make-carray 2048 :element-type 'sample)
+        :for i :below 2048
+        :for sample := (make-sample :left (coerce (sin (* i 1/2048 2 pi)) 'single-float)
+                                    :right (coerce (cos (* i 1/2048 2 pi)) 'single-float))
+        :do (setf (caref (sample-ring-buffer-data ring-buffer) i) sample
+                  (caref sample-buffer i) sample)
+        :finally (is carray-equal sample-buffer (sample-ring-buffer-data ring-buffer))))
