@@ -5,6 +5,13 @@
            #:cobject-pointer
            #:define-struct-cobject
            #:carray
+           #:cpointer
+           #:make-unmanaged-cpointer
+           #:make-managed-cpointer
+           #:unmanage-cpointer
+           #:cref
+           #:cpointer-equal
+           #:cpointer-eq
            #:make-carray
            #:make-unmanaged-carray
            #:make-managed-carray
@@ -96,37 +103,64 @@
 (defun make-managed-cobject (pointer class)
   (manage-cobject (make-unmanaged-cobject pointer class)))
 
-(defstruct (carray (:include cobject)
-                   (:constructor %make-carray))
-  (dimensions '(0) :type (cons fixnum null))
+(defstruct (cpointer (:include cobject)
+                     (:constructor %make-cpointer))
   (element-type nil :type (or symbol cons)))
 
-(defun caref (array &rest subscripts &aux (subscript (first subscripts)))
-  (unless (<= 0 subscript (1- (first (carray-dimensions array))))
-    (error "Index ~D is out of bound." subscript))
+(defun cref (cpointer &optional (subscript 0))
   (multiple-value-bind (definition type)
-      (cobject-class-definition (carray-element-type array))
-    (if definition
-        (funcall
-         (cobject-class-definition-internal-constructor definition)
-         :pointer (cffi:mem-aptr (cobject-pointer array) type subscript)
-         :shared-from array)
-        (cffi:mem-aref (cobject-pointer array) type subscript))))
+        (cobject-class-definition (cpointer-element-type cpointer))
+      (if definition
+          (funcall
+           (cobject-class-definition-internal-constructor definition)
+           :pointer (cffi:mem-aptr (cobject-pointer cpointer) type subscript)
+           :shared-from cpointer)
+          (cffi:mem-aref (cobject-pointer cpointer) type subscript))))
 
-(defun (setf caref) (value array &rest subscripts &aux (subscript (first subscripts)))
-  (unless (<= 0 subscript (1- (first (carray-dimensions array))))
-    (error "Index ~D is out of bound." subscript))
+(defun (setf cref) (value cpointer &optional (subscript 0))
   (multiple-value-bind (definition type)
-      (cobject-class-definition (carray-element-type array))
+      (cobject-class-definition (cpointer-element-type cpointer))
     (if definition
         (let* ((element-size (cffi:foreign-type-size type))
-               (pointer (cffi:inc-pointer (cobject-pointer array) (* element-size subscript))))
+               (pointer (cffi:inc-pointer (cobject-pointer cpointer) (* element-size subscript))))
           (memcpy pointer (cobject-pointer value) element-size)
           (funcall
            (cobject-class-definition-internal-constructor definition)
            :pointer pointer
-           :shared-from array))
-        (setf (cffi:mem-aref (cobject-pointer array) type subscript) value))))
+           :shared-from cpointer))
+        (setf (cffi:mem-aref (cobject-pointer cpointer) type subscript) value))))
+
+(defun cpointer-equal (pointer1 pointer2 &optional (count 1))
+  (unless (equal (cpointer-element-type pointer1) (cpointer-element-type pointer2))
+    (return-from cpointer-equal nil))
+  (zerop (memcmp (cobject-pointer pointer1)
+                 (cobject-pointer pointer2)
+                 (* (cobject-class-object-size (cpointer-element-type pointer1)) count))))
+
+(defun cpointer-eq (pointer1 pointer2)
+  (cffi:pointer-eq (cobject-pointer pointer1) (cobject-pointer pointer2)))
+
+(defun make-unmanaged-cpointer (pointer element-type)
+  (%make-cpointer :pointer pointer :element-type element-type))
+
+(defun make-managed-cpointer (pointer element-type)
+  (manage-cobject (make-unmanaged-cpointer pointer element-type)))
+
+(setf (fdefinition 'unmanage-cpointer) (fdefinition 'unmanage-cobject))
+
+(defstruct (carray (:include cpointer)
+                   (:constructor %make-carray))
+  (dimensions '(0) :type (cons fixnum null)))
+
+(defun caref (array &rest subscripts &aux (subscript (first subscripts)))
+  (unless (<= 0 subscript (1- (first (carray-dimensions array))))
+    (error "Index ~D is out of bound." subscript))
+  (cref array subscript))
+
+(defun (setf caref) (value array &rest subscripts &aux (subscript (first subscripts)))
+  (unless (<= 0 subscript (1- (first (carray-dimensions array))))
+    (error "Index ~D is out of bound." subscript))
+  (setf (cref array subscript) value))
 
 (defmethod print-object ((array carray) stream)
   (print-unreadable-object (array stream)
@@ -236,16 +270,10 @@
   (loop :for i :from start :below end
         :do (setf (caref carray i) item)))
 
-(defun carray-equal (carray1 carray2)
-  (unless (equal (carray-element-type carray1) (carray-element-type carray2))
+(defun carray-equal (array1 array2)
+  (unless (= (clength array1) (clength array2))
     (return-from carray-equal nil))
-  (unless (= (clength carray1) (clength carray2))
-    (return-from carray-equal nil))
-  (zerop (memcmp (cobject-pointer carray1)
-                 (cobject-pointer carray2)
-                 (* (cobject-class-object-size
-                     (carray-element-type carray1))
-                    (clength carray1)))))
+  (cpointer-equal array1 array2 (clength array1)))
 
 (defun find-cobject-class-definition (type)
   (check-type type cffi::foreign-type)
