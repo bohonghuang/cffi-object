@@ -261,3 +261,9 @@
                       (incf i))
                 initial-contents)))))
     array))
+
+(defun make-unmanaged-carray (pointer dimensions element-type)
+  (%make-carray :pointer pointer :dimensions dimensions :element-type element-type))
+
+(defun make-managed-carray (pointer dimensions element-type)
+  (cobject-attach-finalizer (make-unmanaged-carray pointer dimensions element-type)))
