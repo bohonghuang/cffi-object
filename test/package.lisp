@@ -177,3 +177,30 @@
         :do (setf (caref (sample-ring-buffer-data ring-buffer) i) sample
                   (caref sample-buffer i) sample)
         :finally (is carray-equal sample-buffer (sample-ring-buffer-data ring-buffer))))
+
+(define-test nested-array :parent suite
+  (let* ((arr1 (make-carray 2 :element-type '(carray sample 2)
+                              :initial-element (make-carray 2 :element-type 'sample
+                                                              :initial-element (make-sample :left 0.5 :right 1.0)))) 
+         (arr2 (make-unmanaged-carray (cobject-pointer arr1) 'sample 4)))
+    (loop :for i :below 4
+          :for sample := (make-sample :left (/ i 3.0) :right (- (/ i 3.0)))
+          :do (setf (caref arr2 i) sample)
+          :do (multiple-value-bind (i j) (truncate i 2)
+                (is sample-equal sample (caref (caref arr1 i) j))))))
+
+(define-test+run nested-pointer :parent suite
+  (let* ((pptr (foreign-alloc :pointer))
+         (ptr (setf (mem-ref pptr :pointer) (foreign-alloc :uint32)))
+         (value (setf (mem-ref ptr :uint32) 12345))
+         (cpptr (make-managed-cpointer pptr '(cpointer (unsigned-byte 32))))
+         (cptr (make-managed-cpointer ptr '(unsigned-byte 32))))
+    (is cpointer-eq (cref cpptr) cptr)
+    (is = value (cref (cref cpptr)))
+    (is = value (cref cptr))))
+
+(define-test array-pointer :parent suite
+  (let* ((arr1 (make-carray 2048 :element-type 'sample))
+         (arr2 (cref (make-unmanaged-cpointer (cobject-pointer arr1) '(carray sample 2048)))))
+    (is carray-equal arr1 arr2)
+    (is pointer-eq (cobject-pointer arr1) (cobject-pointer arr2))))
