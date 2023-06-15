@@ -6,6 +6,9 @@
            #:define-struct-cobject
            #:carray
            #:make-carray
+           #:make-unmanaged-carray
+           #:make-managed-carray
+           #:unmanage-carray
            #:caref
            #:carray-dimensions
            #:carray-displacement
@@ -51,14 +54,16 @@
     (cobject-class-definition class))
    :pointer pointer))
 
-(declaim (inline cobject-attach-finalizer))
-(defun cobject-attach-finalizer (cobject)
+(defun manage-cobject (cobject)
   (let ((pointer (cobject-pointer cobject)))
     (tg:finalize cobject (lambda () (cffi:foreign-free pointer)))))
 
+(defun unmanage-cobject (cobject)
+  (tg:cancel-finalization cobject)
+  (cobject-pointer cobject))
+
 (defun make-managed-cobject (pointer class)
-  (cobject-attach-finalizer
-   (make-unmanaged-cobject pointer class)))
+  (manage-cobject (make-unmanaged-cobject pointer class)))
 
 (defun find-cobject-class-definition (type)
   (or (assoc-value *cobject-class-definitions* type)
@@ -117,7 +122,7 @@
              ,@(loop :for slot :in slots
                      :collect `(when ,slot
                                  (setf (,(assoc-value slot-accessors slot) ,instance) ,slot)))
-             (cobject-attach-finalizer ,instance)))
+             (manage-cobject ,instance)))
          (declaim (inline ,inplace-copier))
          (defun ,inplace-copier (,instance ,destination)
            (check-type ,instance ,name)
@@ -129,18 +134,16 @@
            (check-type ,instance ,name)
            (let* ((,pointer (cffi:foreign-alloc ',type))
                   (,destination (,internal-constructor :pointer ,pointer)))
-             (cobject-attach-finalizer
+             (manage-cobject
               (,inplace-copier ,instance ,destination))))
          (declaim (inline ,unmanaged-pointer-accessor))
-         (defun ,unmanaged-pointer-accessor (,instance)
-           (tg:cancel-finalization ,instance)
-           (cobject-pointer ,instance))
+         (setf (fdefinition ',unmanaged-pointer-accessor) (fdefinition 'unmanage-cobject))
          (declaim (inline ,unmanaged-constructor))
          (defun ,unmanaged-constructor (,pointer)
            (,internal-constructor :pointer ,pointer))
          (declaim (inline ,managed-constructor))
          (defun ,managed-constructor (,pointer)
-           (cobject-attach-finalizer (,unmanaged-constructor ,pointer)))
+           (manage-cobject (,unmanaged-constructor ,pointer)))
          (defmethod print-object ((,instance ,name) ,stream)
            (print-unreadable-object (,instance ,stream)
              (princ ,(string name) ,stream)
@@ -236,9 +239,9 @@
                                               :element-type element-type
                                               :displaced-to displaced-to
                                               :displaced-index-offset displaced-index-offset))
-                    (cobject-attach-finalizer (%make-carray :pointer pointer
-                                                            :dimensions dimensions
-                                                            :element-type element-type)))))
+                    (manage-cobject (%make-carray :pointer pointer
+                                                  :dimensions dimensions
+                                                  :element-type element-type)))))
     (when initial-element
       (assert (null initial-contents))
       (assert (null displaced-to))
@@ -266,4 +269,6 @@
   (%make-carray :pointer pointer :dimensions dimensions :element-type element-type))
 
 (defun make-managed-carray (pointer dimensions element-type)
-  (cobject-attach-finalizer (make-unmanaged-carray pointer dimensions element-type)))
+  (manage-cobject (make-unmanaged-carray pointer dimensions element-type)))
+
+(setf (fdefinition 'unmanage-carray) (fdefinition 'unmanage-cobject))
