@@ -33,12 +33,12 @@
   (n :size))
 
 (defstruct cobject
-  (pointer (cffi:null-pointer) :type cffi:foreign-pointer))
+  (pointer (cffi:null-pointer) :type cffi:foreign-pointer :read-only t)
+  (shared-from nil :type (or cobject null) :read-only t))
 
 (defstruct cobject-class-definition
   (class nil :type symbol)
   (internal-constructor nil :type symbol)
-  (reference-constructor nil :type symbol)
   (slot-accessors nil :type list)
   (copier nil :type symbol)
   (inplace-copier nil :type symbol)
@@ -108,9 +108,9 @@
       (cobject-class-definition (carray-element-type array))
     (if definition
         (funcall
-         (cobject-class-definition-reference-constructor definition)
+         (cobject-class-definition-internal-constructor definition)
          :pointer (cffi:mem-aptr (cobject-pointer array) type subscript)
-         :source array)
+         :shared-from array)
         (cffi:mem-aref (cobject-pointer array) type subscript))))
 
 (defun (setf caref) (value array &rest subscripts &aux (subscript (first subscripts)))
@@ -123,9 +123,9 @@
                (pointer (cffi:inc-pointer (cobject-pointer array) (* element-size subscript))))
           (memcpy pointer (cobject-pointer value) element-size)
           (funcall
-           (cobject-class-definition-reference-constructor definition)
+           (cobject-class-definition-internal-constructor definition)
            :pointer pointer
-           :source array))
+           :shared-from array))
         (setf (cffi:mem-aref (cobject-pointer array) type subscript) value))))
 
 (defmethod print-object ((array carray) stream)
@@ -142,8 +142,10 @@
 
 (defstruct (displaced-carray (:include carray)
                              (:constructor %make-displaced-carray))
-  (displaced-to 0 :type carray)
-  (displaced-index-offset nil :type fixnum))
+  (displaced-index-offset 0 :type fixnum))
+
+(defun displaced-carray-displaced-to (instance)
+  (displaced-carray-shared-from instance))
 
 (defun carray-displacement (array)
   (typecase array
@@ -175,7 +177,7 @@
                       (%make-displaced-carray :pointer pointer
                                               :dimensions dimensions
                                               :element-type element-type
-                                              :displaced-to displaced-to
+                                              :shared-from displaced-to
                                               :displaced-index-offset displaced-index-offset))
                     (manage-cobject (%make-carray :pointer pointer
                                                   :dimensions dimensions
@@ -256,8 +258,6 @@
          (internal-constructor (symbolicate '#:%make- name))
          (copier (symbolicate '#:copy- name))
          (inplace-copier (symbolicate '#:copy- name '#:-into))
-         (reference (symbolicate name '#:-reference))
-         (reference-constructor (symbolicate '#:make- reference))
          (managed-constructor (symbolicate '#:make-managed- name))
          (unmanaged-constructor (symbolicate '#:make-unmanaged- name))
          (unmanaged-pointer-accessor (symbolicate '#:unmanange- name))
@@ -272,20 +272,15 @@
                      (:predicate ,predicate)
                      (:copier nil)
                      (:constructor ,internal-constructor)))
-         (declaim (inline ,reference-constructor))
-         (defstruct (,reference
-                     (:include ,name)
-                     (:constructor ,reference-constructor))
-           (source nil :type t))
          ,@(loop :for (slot . slot-accessor) :in slot-accessors
                  :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot))
                  :nconc `((declaim (inline ,slot-accessor))
                           (defun ,slot-accessor (,instance)
                             ,(typecase slot-type
                                (cffi::foreign-struct-type
-                                `(,(cobject-class-definition-reference-constructor
+                                `(,(cobject-class-definition-internal-constructor
                                     (find-cobject-class-definition slot-type))
-                                  :source ,instance
+                                  :shared-from ,instance
                                   :pointer (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)))
                                (t `(cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot))))
                           (declaim (inline (setf ,slot-accessor)))
@@ -293,7 +288,7 @@
                             ,(typecase slot-type
                                (cffi::foreign-struct-type
                                 `(memcpy (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
-                                         (cobject-pointer ,value) (cffi:foreign-type-size ,slot-type)))
+                                         (cobject-pointer ,value) (cffi:foreign-type-size ',slot-type)))
                                (t `(setf (cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot) ,value))))))
          (declaim (inline ,constructor))
          (defun ,constructor (&key . ,slots)
@@ -342,7 +337,6 @@
                  (make-cobject-class-definition
                   :class ',name
                   :internal-constructor ',internal-constructor
-                  :reference-constructor ',reference-constructor
                   :slot-accessors ',slot-accessors
                   :copier ',copier
                   :inplace-copier ',inplace-copier
