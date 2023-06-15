@@ -25,6 +25,12 @@
   (src :pointer)
   (n :size))
 
+(declaim (inline memcmp))
+(cffi:defcfun "memcmp" :int
+  (s1 :pointer)
+  (s2 :pointer)
+  (n :size))
+
 (defstruct cobject
   (pointer (cffi:null-pointer) :type cffi:foreign-pointer))
 
@@ -36,6 +42,7 @@
   (copier nil :type symbol)
   (inplace-copier nil :type symbol)
   (predicate nil :type symbol)
+  (equality-comparator nil :type symbol)
   (managed-constructor nil :type symbol)
   (unmanaged-constructor nil :type symbol)
   (unmanaged-pointer-accessor nil :type symbol))
@@ -193,6 +200,17 @@
   (loop :for i :from start :below end
         :do (setf (caref carray i) item)))
 
+(defun carray-equal (carray1 carray2)
+  (unless (eq (carray-element-type carray1) (carray-element-type carray2))
+    (return-from carray-equal nil))
+  (unless (= (clength carray1) (clength carray2))
+    (return-from carray-equal nil))
+  (zerop (memcmp (cobject-pointer carray1)
+                 (cobject-pointer carray2)
+                 (* (cobject-class-object-size
+                     (carray-element-type carray1))
+                    (clength carray1)))))
+
 (defun find-cobject-class-definition (type)
   (or (assoc-value *cobject-class-definitions* type)
       (error "Cannot find the CFFI object class for type ~A." (cffi::name type))))
@@ -200,6 +218,7 @@
 (defmacro define-struct-cobject ((name ctype) &aux (*package* (symbol-package name)))
   (let* ((type (cffi::ensure-parsed-base-type ctype))
          (predicate (symbolicate name '#:-p))
+         (equality-comparator (symbolicate name '#:-equal))
          (constructor (symbolicate '#:make- name))
          (internal-constructor (symbolicate '#:%make- name))
          (copier (symbolicate '#:copy- name))
@@ -251,6 +270,12 @@
                      :collect `(when ,slot
                                  (setf (,(assoc-value slot-accessors slot) ,instance) ,slot)))
              (manage-cobject ,instance)))
+         (declaim (inline ,equality-comparator))
+         ,(with-gensyms (instance1 instance2)
+            `(defun ,equality-comparator (,instance1 ,instance2)
+               (zerop (memcmp (cobject-pointer ,instance1)
+                              (cobject-pointer ,instance2)
+                              (cffi:foreign-type-size ',type)))))
          (declaim (inline ,inplace-copier))
          (defun ,inplace-copier (,instance ,destination)
            (check-type ,instance ,name)
@@ -264,8 +289,8 @@
                   (,destination (,internal-constructor :pointer ,pointer)))
              (manage-cobject
               (,inplace-copier ,instance ,destination))))
-         (declaim (inline ,unmanaged-pointer-accessor))
-         (setf (fdefinition ',unmanaged-pointer-accessor) (fdefinition 'unmanage-cobject))
+         (eval-when (:compile-toplevel :load-toplevel :execute)
+           (setf (fdefinition ',unmanaged-pointer-accessor) (fdefinition 'unmanage-cobject)))
          (declaim (inline ,unmanaged-constructor))
          (defun ,unmanaged-constructor (,pointer)
            (,internal-constructor :pointer ,pointer))
@@ -289,6 +314,7 @@
                   :copier ',copier
                   :inplace-copier ',inplace-copier
                   :predicate ',predicate
+                  :equality-comparator ',equality-comparator
                   :managed-constructor ',managed-constructor
                   :unmanaged-constructor ',unmanaged-constructor
                   :unmanaged-pointer-accessor ',unmanaged-pointer-accessor)))))))
