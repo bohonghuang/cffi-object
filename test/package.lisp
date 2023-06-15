@@ -18,8 +18,10 @@
                   (vec3 (copy-vector2 vec1)))
               (is = 1.0 (vector2-x vec1))
               (is = 2.0 (vector2-y vec1))
+              (true (vector2-equal vec1 vec2))
               (setf (vector2-x vec1) 3.0
                     (vector2-y vec1) 4.0)
+              (false (vector2-equal vec1 vec2))
               (is = 3.0 (vector2-x vec1))
               (is = 4.0 (vector2-y vec1))
               (is = 1.0 (vector2-x vec2))
