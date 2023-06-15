@@ -15,7 +15,8 @@
            #:caref
            #:clength
            #:creplace
-           #:cfill))
+           #:cfill
+           #:carray-equal))
 
 (in-package #:cffi-object)
 
@@ -50,13 +51,33 @@
 (declaim (type list *cobject-class-definitions*))
 (defvar *cobject-class-definitions* nil)
 
+(defun primitive-type-p (type)
+  (if (consp type)
+      (destructuring-case type
+        ((signed-byte n)
+         (case n
+           (8 :int8)
+           (16 :int16)
+           (32 :int32)
+           (64 :int64)))
+        ((unsigned-byte n)
+         (case n
+           (8 :uint8)
+           (16 :uint16)
+           (32 :uint32)
+           (64 :uint64))))
+      (case type
+        (single-float :float)
+        (double-float :double))))
+
 (defun cobject-class-definition (class)
   (if-let ((cons (find class *cobject-class-definitions* :key (compose #'cobject-class-definition-class #'cdr))))
     (values (cdr cons) (car cons))
-    (error "Undefined CFFI object class ~A." class)))
+    (values nil (or (primitive-type-p class) (error "Undefined CFFI object class ~A." class)))))
 
 (defun cobject-class-object-size (class)
-  (cffi:foreign-type-size (nth-value 1 (cobject-class-definition class))))
+  (if-let ((type (nth-value 1 (cobject-class-definition class))))
+    (cffi:foreign-type-size type)))
 
 (defun make-unmanaged-cobject (pointer class)
   (funcall
@@ -78,30 +99,34 @@
 (defstruct (carray (:include cobject)
                    (:constructor %make-carray))
   (dimensions '(0) :type (cons fixnum null))
-  (element-type nil :type symbol))
+  (element-type nil :type (or symbol cons)))
 
 (defun caref (array &rest subscripts &aux (subscript (first subscripts)))
   (unless (<= 0 subscript (1- (first (carray-dimensions array))))
     (error "Index ~D is out of bound." subscript))
   (multiple-value-bind (definition type)
       (cobject-class-definition (carray-element-type array))
-    (funcall
-     (cobject-class-definition-reference-constructor definition)
-     :pointer (cffi:mem-aptr (cobject-pointer array) type subscript)
-     :source array)))
+    (if definition
+        (funcall
+         (cobject-class-definition-reference-constructor definition)
+         :pointer (cffi:mem-aptr (cobject-pointer array) type subscript)
+         :source array)
+        (cffi:mem-aref (cobject-pointer array) type subscript))))
 
 (defun (setf caref) (value array &rest subscripts &aux (subscript (first subscripts)))
   (unless (<= 0 subscript (1- (first (carray-dimensions array))))
     (error "Index ~D is out of bound." subscript))
   (multiple-value-bind (definition type)
       (cobject-class-definition (carray-element-type array))
-    (let* ((element-size (cffi:foreign-type-size type))
-           (pointer (cffi:inc-pointer (cobject-pointer array) (* element-size subscript))))
-      (memcpy pointer (cobject-pointer value) element-size)
-      (funcall
-       (cobject-class-definition-reference-constructor definition)
-       :pointer pointer
-       :source array))))
+    (if definition
+        (let* ((element-size (cffi:foreign-type-size type))
+               (pointer (cffi:inc-pointer (cobject-pointer array) (* element-size subscript))))
+          (memcpy pointer (cobject-pointer value) element-size)
+          (funcall
+           (cobject-class-definition-reference-constructor definition)
+           :pointer pointer
+           :source array))
+        (setf (cffi:mem-aref (cobject-pointer array) type subscript) value))))
 
 (defmethod print-object ((array carray) stream)
   (print-unreadable-object (array stream)
@@ -138,14 +163,15 @@
                       (displaced-index-offset 0))
   (unless (listp dimensions)
     (setf dimensions (list dimensions)))
-  (let* ((element-size (cobject-class-object-size element-type))
+  (let* ((primitive-type-p (primitive-type-p element-type))
+         (element-size (cobject-class-object-size element-type))
          (total-size (* element-size (reduce #'* dimensions)))
          (pointer (if displaced-to (cffi:inc-pointer (cobject-pointer displaced-to) (* element-size displaced-index-offset))
                       (cffi:foreign-alloc :uint8 :count total-size)))
          (array (if displaced-to
                     (progn
                       (assert (<= 0 displaced-index-offset (+ displaced-index-offset (first dimensions)) (first (carray-dimensions displaced-to))))
-                      (assert (eq element-type (carray-element-type displaced-to)))
+                      (assert (equal element-type (carray-element-type displaced-to)))
                       (%make-displaced-carray :pointer pointer
                                               :dimensions dimensions
                                               :element-type element-type
@@ -157,9 +183,12 @@
     (when initial-element
       (assert (null initial-contents))
       (assert (null displaced-to))
-      (loop :with src := (cobject-pointer initial-element)
-            :for i :of-type fixnum :below (first dimensions)
-            :do (memcpy (cffi:inc-pointer pointer (* i element-size)) src element-size)))
+      (if primitive-type-p
+          (loop :for i :of-type fixnum :below (first dimensions)
+                :do (setf (cffi:mem-aref pointer primitive-type-p i) initial-element))
+          (loop :with src := (cobject-pointer initial-element)
+                :for i :of-type fixnum :below (first dimensions)
+                :do (memcpy (cffi:inc-pointer pointer (* i element-size)) src element-size))))
     (when initial-contents
       (assert (null initial-element))
       (assert (null displaced-to))
@@ -170,10 +199,14 @@
         (sequence
          (assert (= (first dimensions) (length initial-contents)))
          (let ((i 0))
-           (map nil (lambda (object)
-                      (memcpy (cffi:inc-pointer pointer (* i element-size))
-                              (cobject-pointer object) element-size)
-                      (incf i))
+           (map nil (if primitive-type-p
+                        (lambda (object)
+                          (setf (cffi:mem-aref pointer primitive-type-p i) object)
+                          (incf i))
+                        (lambda (object)
+                          (memcpy (cffi:inc-pointer pointer (* i element-size))
+                                  (cobject-pointer object) element-size)
+                          (incf i)))
                 initial-contents)))))
     array))
 
@@ -189,8 +222,8 @@
                  &key
                    (start1 0) (end1 (clength target-carray1))
                    (start2 0) (end2 (clength source-carray2)))
-  (assert (eq (carray-element-type target-carray1) (carray-element-type source-carray2)))
-  (assert (<= 0 (- end1 start1) (- end2 start2)))
+  (assert (equal (carray-element-type target-carray1) (carray-element-type source-carray2)))
+  (assert (<= 0 (- end2 start2) (- end1 start1)))
   (let ((element-size (cobject-class-object-size (carray-element-type target-carray1))))
     (memcpy (cffi:inc-pointer (cobject-pointer target-carray1) (* start1 element-size))
             (cffi:inc-pointer (cobject-pointer source-carray2) (* start2 element-size))
@@ -201,7 +234,7 @@
         :do (setf (caref carray i) item)))
 
 (defun carray-equal (carray1 carray2)
-  (unless (eq (carray-element-type carray1) (carray-element-type carray2))
+  (unless (equal (carray-element-type carray1) (carray-element-type carray2))
     (return-from carray-equal nil))
   (unless (= (clength carray1) (clength carray2))
     (return-from carray-equal nil))
