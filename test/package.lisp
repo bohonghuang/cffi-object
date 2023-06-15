@@ -204,3 +204,17 @@
          (arr2 (cref (make-unmanaged-cpointer (cobject-pointer arr1) '(carray sample 2048)))))
     (is carray-equal arr1 arr2)
     (is pointer-eq (cobject-pointer arr1) (cobject-pointer arr2))))
+
+(defcstruct sample-vector
+  (data (:pointer (:struct sample)))
+  (size :size))
+
+(define-struct-cobject (sample-vector (:struct sample-vector)))
+
+(define-test object-pointer-in-struct :parent suite
+  (let* ((buffer (make-carray 4 :element-type 'sample))
+         (buffer-pointer (make-unmanaged-cpointer (cobject-pointer buffer) 'sample))
+         (vector1 (make-sample-vector :data buffer :size 4))
+         (vector2 (make-sample-vector :data buffer-pointer :size 4)))
+    (is cpointer-eq buffer-pointer (sample-vector-data vector1))
+    (is cpointer-eq buffer-pointer (sample-vector-data vector2))))
