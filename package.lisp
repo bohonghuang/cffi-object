@@ -367,32 +367,44 @@
                      (:constructor ,internal-constructor)))
          ,@(loop :for (slot . slot-accessor) :in slot-accessors
                  :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot))
+                 :for slot-pointer := `(cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
+                 :for slot-value := `(cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot)
                  :nconc `((declaim (inline ,slot-accessor))
                           (defun ,slot-accessor (,instance)
                             ,(typecase slot-type
                                (cffi::foreign-struct-type
                                 `(,(cobject-class-definition-internal-constructor
                                     (find-cobject-class-definition slot-type))
-                                  :shared-from ,instance
-                                  :pointer (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)))
+                                  :pointer ,slot-pointer
+                                  :shared-from ,instance))
                                (cffi::foreign-array-type
                                 `(%make-carray
-                                  :pointer (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
+                                  :pointer ,slot-pointer
+                                  :shared-from ,instance
                                   :dimensions ',(cffi::dimensions slot-type)
                                   :element-type ',(cobject-class-definition-class
                                                    (find-cobject-class-definition
                                                     (cffi::ensure-parsed-base-type
                                                      (cffi::element-type slot-type))))))
-                               (t `(cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot))))
+                               (cffi::foreign-pointer-type
+                                `(%make-cpointer
+                                  :pointer ,slot-value
+                                  :shared-from ,instance
+                                  :element-type ',(cobject-class-definition-class
+                                                   (find-cobject-class-definition
+                                                    (cffi::ensure-parsed-base-type
+                                                     (cffi::pointer-type slot-type))))))
+                               (t slot-value)))
                           (declaim (inline (setf ,slot-accessor)))
                           (defun (setf ,slot-accessor) (,value ,instance)
                             ,(typecase slot-type
                                (cffi::foreign-struct-type
-                                `(memcpy (cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
-                                         (cobject-pointer ,value) (cffi:foreign-type-size ',slot-type)))
+                                `(memcpy ,slot-pointer (cobject-pointer ,value) (cffi:foreign-type-size ',slot-type)))
                                (cffi::foreign-array-type
                                 `(creplace (,slot-accessor ,instance) ,value))
-                               (t `(setf (cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot) ,value))))))
+                               (cffi::foreign-pointer-type
+                                `(setf ,slot-value (cobject-pointer ,value)))
+                               (t `(setf ,slot-value ,value))))))
          (declaim (inline ,constructor))
          (defun ,constructor (&key . ,slots)
            (let* ((,pointer (cffi:foreign-alloc ',type))
