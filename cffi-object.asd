@@ -7,7 +7,15 @@
   :homepage "https://github.com/bohonghuang/cffi-object"
   :bug-tracker "https://github.com/bohonghuang/cffi-object/issues"
   :source-control (:git "https://github.com/bohonghuang/cffi-object.git")
-  :components ((:file "package"))
+  :serial t
+  :components ((:file "package")
+               (:file "libc")
+               (:file "type")
+               (:file "definition")
+               (:file "object")
+               (:file "pointer")
+               (:file "array")
+               (:file "macros"))
   :depends-on (#:alexandria #:cffi #:trivial-garbage)
   :in-order-to ((test-op (test-op #:cffi-object/test))))
 
