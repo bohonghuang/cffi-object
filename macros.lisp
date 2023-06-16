@@ -146,17 +146,7 @@
                  (format ,stream ,(concatenate 'string " @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
                          (cffi:pointer-address (cobject-pointer ,instance)))))
              (eval-when (:compile-toplevel :load-toplevel :execute)
-               (setf (assoc-value *cobject-class-definitions* ',type) (make-cobject-class-definition :class ',name
-                                                                                                     :constructor ',constructor
-                                                                                                     :internal-constructor ',internal-constructor
-                                                                                                     :slot-accessors ',slot-accessors
-                                                                                                     :copier ',copier
-                                                                                                     :inplace-copier ',inplace-copier
-                                                                                                     :predicate ',predicate
-                                                                                                     :equality-comparator ',equality-comparator
-                                                                                                     :managed-constructor ',managed-constructor
-                                                                                                     :unmanaged-constructor ',unmanaged-constructor
-                                                                                                     :unmanaged-pointer-accessor ',unmanaged-pointer-accessor)))))))))
+               (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition))))))))
 
 (defmacro define-type-cobject (desc)
   (with-parsed-desc (name type) desc
@@ -176,19 +166,7 @@
                    (fdefinition ',unmanaged-pointer-accessor) (fdefinition ',(cobject-class-definition-unmanaged-pointer-accessor definition))
                    . ,(mapcan (lambda (var val) `((fdefinition ',(cdr var)) (fdefinition ',(cdr val)))) slot-accessors (cobject-class-definition-slot-accessors definition)))
              (eval-when (:compile-toplevel :load-toplevel :execute)
-               (setf (assoc-value *cobject-class-definitions* ',type)
-                     (make-cobject-class-definition
-                      :class ',name
-                      :constructor ',constructor
-                      :internal-constructor ',internal-constructor
-                      :slot-accessors ',slot-accessors
-                      :copier ',copier
-                      :inplace-copier ',inplace-copier
-                      :predicate ',predicate
-                      :equality-comparator ',equality-comparator
-                      :managed-constructor ',managed-constructor
-                      :unmanaged-constructor ',unmanaged-constructor
-                      :unmanaged-pointer-accessor ',unmanaged-pointer-accessor))))
+               (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition)))
           (error "Definition for the base type of ~A is not found." type))))))
 
 (defmacro define-package-cobject (desc)
