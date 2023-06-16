@@ -52,6 +52,7 @@
   (unless (listp dimensions)
     (setf dimensions (list dimensions)))
   (let* ((primitive-type-p (primitive-type-p element-type))
+         (pointer-type-p (and (listp element-type) (eq (first element-type) 'cpointer)))
          (element-size (cobject-class-object-size element-type))
          (total-size (* element-size (reduce #'* dimensions)))
          (pointer (if displaced-to (cffi:inc-pointer (cobject-pointer displaced-to) (* element-size displaced-index-offset))
@@ -71,12 +72,16 @@
     (when initial-element
       (assert (null initial-contents))
       (assert (null displaced-to))
-      (if primitive-type-p
-          (loop :for i :of-type fixnum :below (first dimensions)
-                :do (setf (cffi:mem-aref pointer primitive-type-p i) initial-element))
-          (loop :with src := (cobject-pointer initial-element)
-                :for i :of-type fixnum :below (first dimensions)
-                :do (memcpy (cffi:inc-pointer pointer (* i element-size)) src element-size))))
+      (cond
+        (primitive-type-p
+         (loop :for i :of-type fixnum :below (first dimensions)
+               :do (setf (cffi:mem-aref pointer primitive-type-p i) initial-element)))
+        (pointer-type-p
+         (loop :for i :of-type fixnum :below (first dimensions)
+               :do (setf (cffi:mem-aref pointer :pointer i) (cobject-pointer initial-element))))
+        (t (loop :with src := (cobject-pointer initial-element)
+                 :for i :of-type fixnum :below (first dimensions)
+                 :do (memcpy (cffi:inc-pointer pointer (* i element-size)) src element-size)))))
     (when initial-contents
       (assert (null initial-element))
       (assert (null displaced-to))
@@ -87,14 +92,19 @@
         (sequence
          (assert (= (first dimensions) (length initial-contents)))
          (let ((i 0))
-           (map nil (if primitive-type-p
-                        (lambda (object)
-                          (setf (cffi:mem-aref pointer primitive-type-p i) object)
-                          (incf i))
-                        (lambda (object)
-                          (memcpy (cffi:inc-pointer pointer (* i element-size))
-                                  (cobject-pointer object) element-size)
-                          (incf i)))
+           (map nil (cond
+                      (primitive-type-p
+                       (lambda (object)
+                         (setf (cffi:mem-aref pointer primitive-type-p i) object)
+                         (incf i)))
+                      (pointer-type-p
+                       (lambda (object)
+                         (setf (cffi:mem-aref pointer :pointer i) (cobject-pointer object))
+                         (incf i)))
+                      (t (lambda (object)
+                           (memcpy (cffi:inc-pointer pointer (* i element-size))
+                                   (cobject-pointer object) element-size)
+                           (incf i))))
                 initial-contents)))))
     array))
 

@@ -233,3 +233,10 @@
     (is string= "789" (caref strarr 2))
     (setf (caref strarr 0) "000")
     (is string= "000" (caref strarr 0))))
+
+(define-test array-of-pointer :parent suite
+  (let ((arr (make-carray 3 :element-type '(carray (cpointer (signed-byte 8)) 1)
+                            :initial-element (make-carray 1 :element-type '(cpointer (signed-byte 8))
+                                                            :initial-element (make-unmanaged-cpointer (cffi-sys::make-pointer 123) '(signed-byte 8))))))
+    (loop :for i :below 3
+          :do (is cpointer-eq (caref (caref arr i) 0) (make-unmanaged-cpointer (make-pointer 123) '(signed-byte 8))))))
