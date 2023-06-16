@@ -3,6 +3,7 @@
 (defstruct cobject-class-definition
   (class nil :type (or symbol list))
   (internal-constructor nil :type (or symbol function))
+  (constructor nil :type symbol)
   (slot-accessors nil :type list)
   (copier nil :type symbol)
   (inplace-copier nil :type symbol)
@@ -61,6 +62,7 @@
                       `(signed-byte ,(* (cffi:foreign-type-size type) 8)))
                      (#.(mapcar #'cffi::ensure-parsed-base-type '(:uint8 :uint16 :uint32 :uint64))
                       `(unsigned-byte ,(* (cffi:foreign-type-size type) 8)))
+                     (#.(cffi::ensure-parsed-base-type :void) 'null)
                      (t (etypecase type
                           (cffi::foreign-array-type
                            `(carray ,(cobject-class-definition-class

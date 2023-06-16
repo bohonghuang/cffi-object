@@ -16,7 +16,7 @@
                (:file "pointer")
                (:file "array")
                (:file "macros"))
-  :depends-on (#:alexandria #:cffi #:trivial-garbage)
+  :depends-on (#:alexandria #:cffi #:trivial-garbage #:cl-digraph)
   :in-order-to ((test-op (test-op #:cffi-object/test))))
 
 (defsystem cffi-object/test
