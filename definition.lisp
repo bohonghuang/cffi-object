@@ -35,8 +35,8 @@
                             (as-pointer (values (make-cobject-class-definition
                                                  :class type
                                                  :internal-constructor (lambda (&key pointer shared-from)
+                                                                         (declare (ignore shared-from))
                                                                          (%make-cpointer :pointer (cffi:mem-ref pointer :pointer)
-                                                                                         :shared-from shared-from
                                                                                          :element-type element-type)))
                                                 `(:pointer ,(nth-value 1 (cobject-class-definition element-type))))))
             (destructuring-ecase type

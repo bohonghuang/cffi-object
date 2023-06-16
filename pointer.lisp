@@ -4,6 +4,12 @@
                      (:constructor %make-cpointer))
   (element-type nil :type (or symbol cons)))
 
+(defmethod print-object ((pointer cpointer) stream)
+  (print-unreadable-object (pointer stream)
+    (format stream #.(concatenate 'string "~A @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
+            (cpointer-element-type pointer)
+            (cffi:pointer-address (cobject-pointer pointer)))))
+
 (defun cref (cpointer &optional (subscript 0))
   (multiple-value-bind (definition type)
         (cobject-class-definition (cpointer-element-type cpointer))

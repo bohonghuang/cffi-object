@@ -143,7 +143,7 @@
                  (princ ,(string name) ,stream)
                  ,@(loop :for (slot . slot-accessor) :in slot-accessors
                          :collect `(format ,stream ," :~A ~S" ,(symbol-name slot) (,slot-accessor ,instance)))
-                 (format ,stream ,(concatenate 'string " @0x~" (prin1-to-string (cffi:foreign-type-size :size)) ",'0X")
+                 (format ,stream ,(concatenate 'string " @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
                          (cffi:pointer-address (cobject-pointer ,instance)))))
              (eval-when (:compile-toplevel :load-toplevel :execute)
                (setf (assoc-value *cobject-class-definitions* ',type) (make-cobject-class-definition :class ',name
