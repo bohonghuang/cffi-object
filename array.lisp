@@ -126,11 +126,13 @@
   (let ((element-size (cobject-class-object-size (carray-element-type target-carray1))))
     (memcpy (cffi:inc-pointer (cobject-pointer target-carray1) (* start1 element-size))
             (cffi:inc-pointer (cobject-pointer source-carray2) (* start2 element-size))
-            (* (- end2 start2) element-size))))
+            (* (- end2 start2) element-size))
+    target-carray1))
 
 (defun cfill (carray item &key (start 0) (end (clength carray)))
   (loop :for i :from start :below end
-        :do (setf (caref carray i) item)))
+        :do (setf (caref carray i) item)
+        :finally (return carray)))
 
 (defun carray-equal (array1 array2)
   (unless (= (clength array1) (clength array2))
