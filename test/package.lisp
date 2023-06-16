@@ -189,7 +189,7 @@
           :do (multiple-value-bind (i j) (truncate i 2)
                 (is sample-equal sample (caref (caref arr1 i) j))))))
 
-(define-test+run nested-pointer :parent suite
+(define-test nested-pointer :parent suite
   (let* ((pptr (foreign-alloc :pointer))
          (ptr (setf (mem-ref pptr :pointer) (foreign-alloc :uint32)))
          (value (setf (mem-ref ptr :uint32) 12345))
@@ -218,3 +218,18 @@
          (vector2 (make-sample-vector :data buffer-pointer :size 4)))
     (is cpointer-eq buffer-pointer (sample-vector-data vector1))
     (is cpointer-eq buffer-pointer (sample-vector-data vector2))))
+
+(defcstruct foreign-string
+  (data :string))
+
+(define-struct-cobject (foreign-string (:struct foreign-string)))
+
+(define-test string :parent suite
+  (let ((str (make-foreign-string :data "Test")))
+    (is string= "Test" (foreign-string-data str)))
+  (let ((strarr (make-carray 3 :element-type 'string :initial-contents '("123" "456" "789"))))
+    (is string= "123" (caref strarr 0))
+    (is string= "456" (caref strarr 1))
+    (is string= "789" (caref strarr 2))
+    (setf (caref strarr 0) "000")
+    (is string= "000" (caref strarr 0))))

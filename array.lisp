@@ -22,7 +22,7 @@
             :unless (zerop i)
               :do (format stream "~%  ")
             :end
-            :and :do (princ (caref array i) stream)
+            :and :do (prin1 (caref array i) stream)
           :else
             :return (format stream " ... [~D elements elided]" (- length 10)))))
 

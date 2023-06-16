@@ -142,7 +142,7 @@
                (print-unreadable-object (,instance ,stream)
                  (princ ,(string name) ,stream)
                  ,@(loop :for (slot . slot-accessor) :in slot-accessors
-                         :collect `(format ,stream ," :~A ~A" ,(symbol-name slot) (,slot-accessor ,instance)))
+                         :collect `(format ,stream ," :~A ~S" ,(symbol-name slot) (,slot-accessor ,instance)))
                  (format ,stream ,(concatenate 'string " @0x~" (prin1-to-string (cffi:foreign-type-size :size)) ",'0X")
                          (cffi:pointer-address (cobject-pointer ,instance)))))
              (eval-when (:compile-toplevel :load-toplevel :execute)

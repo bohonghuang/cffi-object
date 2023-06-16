@@ -17,7 +17,8 @@
            (64 :uint64))))
       (case type
         (single-float :float)
-        (double-float :double))))
+        (double-float :double)
+        (string :string))))
 
 (defun cobject-type= (type1 type2)
   (if (and (listp type1) (listp type2)

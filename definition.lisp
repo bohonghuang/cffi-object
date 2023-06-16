@@ -58,6 +58,7 @@
             :class (case type
                      (#.(cffi::ensure-parsed-base-type :float) 'single-float)
                      (#.(cffi::ensure-parsed-base-type :double) 'double-float)
+                     (#.(cffi::ensure-parsed-base-type :string) 'string)
                      (#.(mapcar #'cffi::ensure-parsed-base-type '(:int8 :int16 :int32 :int64))
                       `(signed-byte ,(* (cffi:foreign-type-size type) 8)))
                      (#.(mapcar #'cffi::ensure-parsed-base-type '(:uint8 :uint16 :uint32 :uint64))
