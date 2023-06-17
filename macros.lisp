@@ -177,7 +177,7 @@
       (shiftf source target *package*))
     (loop :with source-package := (find-package source) :and target-package := (find-package target)
           :with definitions :and type-set := (make-hash-table)
-          :for (source-name . type-getter) :in (nconc (hash-table-alist cffi::*struct-type-parsers*)
+          :for (source-name . type-getter) :in (nconc (hash-table-alist cffi::*default-type-parsers*)
                                                       (hash-table-alist cffi::*struct-type-parsers*))
           :when (eql (symbol-package source-name) source-package)
             :do (symbol-macrolet ((name (intern (symbol-name (cffi::name type)) target-package)))

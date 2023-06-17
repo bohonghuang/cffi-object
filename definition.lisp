@@ -13,6 +13,23 @@
   (unmanaged-constructor nil :type symbol)
   (unmanaged-pointer-accessor nil :type symbol))
 
+(defun cobject-class-definition-symbols (definition &optional internalp)
+  (remove-if-not
+   (conjoin #'symbolp #'identity)
+   (nconc
+    (list
+     (cobject-class-definition-class definition)
+     (cobject-class-definition-constructor definition)
+     (cobject-class-definition-copier definition)
+     (cobject-class-definition-inplace-copier definition)
+     (cobject-class-definition-predicate definition)
+     (cobject-class-definition-equality-comparator definition)
+     (cobject-class-definition-managed-constructor definition)
+     (cobject-class-definition-unmanaged-constructor definition)
+     (cobject-class-definition-unmanaged-pointer-accessor definition))
+    (mapcar #'cdr (cobject-class-definition-slot-accessors definition))
+    (when internalp (list (cobject-class-definition-internal-constructor definition))))))
+
 (declaim (type list *cobject-class-definitions*))
 (defvar *cobject-class-definitions* nil)
 
