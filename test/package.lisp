@@ -138,10 +138,10 @@
         (addr (make-carray 4 :element-type '(unsigned-byte 8)
                              :initial-contents #(192 168 31 1))))
     (creplace (sockaddr-sa-data sockaddr)
-              (print (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2))
+              (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2)
               :start1 0)
     (creplace (sockaddr-sa-data sockaddr)
-              (print (make-unmanaged-carray (cobject-pointer addr) '(signed-byte 8) 4))
+              (make-unmanaged-carray (cobject-pointer addr) '(signed-byte 8) 4)
               :start1 2)
     (is carray-equal
         (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2)
