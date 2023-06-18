@@ -113,7 +113,7 @@
   (%make-carray :pointer pointer :dimensions dimensions :element-type element-type))
 
 (defun make-managed-carray (pointer element-type dimensions)
-  (manage-cobject (make-unmanaged-carray pointer dimensions element-type)))
+  (manage-cobject (make-unmanaged-carray pointer element-type dimensions)))
 
 (setf (fdefinition 'unmanage-carray) (fdefinition 'unmanage-cobject))
 

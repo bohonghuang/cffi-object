@@ -148,7 +148,7 @@
         (make-carray 2 :element-type '(signed-byte 8)
                        :displaced-to (sockaddr-sa-data sockaddr)
                        :displaced-index-offset 0))
-    (loop :with addr := (make-unmanaged-carray (cobject-pointer addr) '(signed-byte 8) 4)
+    (loop :with addr := (make-managed-carray (unmanage-carray addr) '(signed-byte 8) 4)
           :for i :below 4
           :for j :from 2
           :do (is = (caref addr i) (caref (sockaddr-sa-data sockaddr) j)))))
