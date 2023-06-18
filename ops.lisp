@@ -1,0 +1,35 @@
+(defpackage cffi-object.ops
+  (:use #:cl #:alexandria)
+  (:nicknames #:cobj.ops)
+  (:export #:enable-cobject-ops #:disable-cobject-ops))
+
+(in-package #:cffi-object.ops)
+
+(defconstant +form-type+ (fdefinition 'cffi-ops::form-type))
+
+(defconstant +ctypes-slots+ (fdefinition 'cffi-ops::ctypes-slots))
+
+(defun ctypes-slots-with-cobject (types)
+  (funcall +ctypes-slots+ (mapcar (lambda (type)
+                                    (if (and (listp type) (eq (car type) :object))
+                                        (cons :pointer (cdr type))
+                                        type))
+                                  types)))
+
+(defun form-type-with-object-unwrapped (form)
+  (multiple-value-bind (type form) (funcall +form-type+ form)
+    (cond
+      (cffi-ops::*value-required* (values type form))
+      ((and (listp type) (member (car type) '(nil :object)))
+       (values (cons :pointer (cdr type)) `(cobj:cobject-pointer ,form)))
+      (t (values type form)))))
+
+(defun enable-cobject-ops ()
+  (setf (fdefinition 'cffi-ops::form-type) #'form-type-with-object-unwrapped
+        (fdefinition 'cffi-ops::ctypes-slots) #'ctypes-slots-with-cobject
+        (fdefinition 'cffi-ops:&) #'cobj:cobject-pointer))
+
+(defun disable-cobject-ops ()
+  (setf (fdefinition 'cffi-ops::form-type) +form-type+
+        (fdefinition 'cffi-ops::ctypes-slots) +ctypes-slots+)
+  (fmakunbound 'cffi-ops:&))

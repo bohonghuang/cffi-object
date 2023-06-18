@@ -20,7 +20,7 @@
   :in-order-to ((test-op (test-op #:cffi-object/test))))
 
 (defsystem cffi-object/test
-  :depends-on (#:cffi-object #:parachute)
+  :depends-on (#:cffi-ops #:cffi-object #:cffi-object.ops #:parachute)
   :pathname "./test/"
   :components ((:file "package"))
   :perform (test-op (op c) (symbol-call '#:parachute '#:test (find-symbol (symbol-name '#:suite) '#:cffi-object.test))))

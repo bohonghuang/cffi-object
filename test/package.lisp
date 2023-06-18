@@ -1,5 +1,5 @@
 (defpackage cffi-object.test
-  (:use #:cl #:parachute #:cffi #:cffi-object))
+  (:use #:cl #:parachute #:cffi #:cffi-ops #:cffi-object))
 
 (in-package #:cffi-object.test)
 
@@ -240,3 +240,21 @@
                                                             :initial-element (make-unmanaged-cpointer (cffi-sys::make-pointer 123) '(signed-byte 8))))))
     (loop :for i :below 3
           :do (is cpointer-eq (caref (caref arr i) 0) (make-unmanaged-cpointer (make-pointer 123) '(signed-byte 8))))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (cobj.ops:enable-cobject-ops))
+
+(define-test ops :parent suite
+  (let* ((vec2 (make-vector2 :x 1.0 :y 2.0))
+         (cam (make-camera-2d :offset vec2))
+         (cam2 (copy-camera-2d cam)))
+    (clocally (declare (ctype (:object (:struct vector2)) vec2)
+                       (ctype (:object (:struct camera-2d)) cam))
+      (is = 1.0 (-> vec2 x))
+      (is = 2.0 (-> (& vec2) y))
+      (is = 1.0 (-> cam offset x))
+      (is = 2.0 (-> (& cam) offset y))
+      (is eql (find-class 'camera-2d) (class-of cam))
+      (of-type foreign-pointer (& cam))
+      (of-type foreign-pointer (& cam2)))
+    (of-type foreign-pointer (& cam))))

@@ -236,5 +236,19 @@ To test the system, simply eval ~(asdf:test-system :cffi-object)~ in the REPL.
   It is more focused on interoperation with foreign anyway.
 - [[https://github.com/bohonghuang/cffi-ops][cffi-ops]] \\
   ~cffi-ops~ provides some macros expanded at compile-time, so it doesn't cons and can be used in performance-sensitive functions,
-  which allows you to implement GC-free and high performance algorithms. I may add ~cffi-ops~ integration for ~cffi-object~ in the future,
-  but currently there is nothing preventing you from using ~cobj:cobject-pointer~ to obtain pointers from objects and then using ~cffi-ops~ on them.
+  which allows you to implement GC-free and high performance algorithms.
+  System ~cffi-object.ops~ provides ~cffi-object~ the integration with ~cffi-ops~, which can be enabled by ~(cobj.ops:enable-cobject-ops)~ at compile-time:
+
+  #+BEGIN_SRC lisp
+    (cl:in-package #:mylib)
+
+    (eval-when (:compile-toplevel :load-toplevel :execute)
+      (cobj.ops:enable-cobject-ops))
+
+    (let ((vec1 (make-vector2 :x 1.0 :y 2.0))
+          (vec2 (make-vector2 :x 3.0 :y 4.0)))
+      (clocally (declare (ctype (:object (:struct vector2)) vec1 vec2))
+        (vector2-add (& vec1) (& vec1) (& vec2))
+        (assert (= (-> vec1 x) 4.0))
+        (assert (= (-> (& vec1) y) 6.0))))
+  #+END_SRC
