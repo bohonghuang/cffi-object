@@ -24,12 +24,17 @@
        (values (cons :pointer (cdr type)) `(cobj:cobject-pointer ,form)))
       (t (values type form)))))
 
+(defmacro & (form)
+  `(cobj:cobject-pointer ,form))
+
 (defun enable-cobject-ops ()
   (setf (fdefinition 'cffi-ops::form-type) #'form-type-with-object-unwrapped
         (fdefinition 'cffi-ops::ctypes-slots) #'ctypes-slots-with-cobject
-        (fdefinition 'cffi-ops:&) #'cobj:cobject-pointer))
+        (fdefinition 'cffi-ops:&) #'cobj:cobject-pointer
+        (compiler-macro-function 'cffi-ops:&) (macro-function '&)))
 
 (defun disable-cobject-ops ()
   (setf (fdefinition 'cffi-ops::form-type) +form-type+
-        (fdefinition 'cffi-ops::ctypes-slots) +ctypes-slots+)
+        (fdefinition 'cffi-ops::ctypes-slots) +ctypes-slots+
+        (compiler-macro-function 'cffi-ops:&) nil)
   (fmakunbound 'cffi-ops:&))
