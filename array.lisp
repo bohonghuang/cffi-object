@@ -138,3 +138,7 @@
   (unless (= (clength array1) (clength array2))
     (return-from carray-equal nil))
   (cpointer-equal array1 array2 (clength array1)))
+
+(defun carray-list (array)
+  (loop :for i :below (clength array)
+        :collect (caref array i)))
