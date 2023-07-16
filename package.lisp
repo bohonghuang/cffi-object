@@ -19,6 +19,7 @@
            #:carray-displacement
            #:carray-element-type
            #:carray-list
+           #:carray-array
            #:caref
            #:clength
            #:creplace

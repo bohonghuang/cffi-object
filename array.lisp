@@ -142,3 +142,10 @@
 (defun carray-list (array)
   (loop :for i :below (clength array)
         :collect (caref array i)))
+
+(defun carray-array (carray)
+  (loop :with length := (clength carray)
+        :with array := (make-array length)
+        :for i :below length
+        :do (setf (aref array i) (caref carray i))
+        :finally (return array)))
