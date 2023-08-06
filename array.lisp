@@ -40,7 +40,8 @@
              (displaced-carray-displaced-index-offset array)))
     (t (values nil nil))))
 
-(declaim (inline clength))
+(declaim (inline clength)
+         (ftype (function (carray) non-negative-fixnum) clength))
 (defun clength (carray)
   (first (carray-dimensions carray)))
 
@@ -139,10 +140,12 @@
     (return-from carray-equal nil))
   (cpointer-equal array1 array2 (clength array1)))
 
+(declaim (ftype (function (carray) (values list)) carray-list))
 (defun carray-list (array)
   (loop :for i :below (clength array)
         :collect (caref array i)))
 
+(declaim (ftype (function (carray) (values simple-array)) carray-array))
 (defun carray-array (carray)
   (loop :with length := (clength carray)
         :with array := (make-array length)

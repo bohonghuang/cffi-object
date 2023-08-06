@@ -4,6 +4,9 @@
   (pointer (cffi:null-pointer) :type cffi:foreign-pointer :read-only t)
   (shared-from nil :type (or cobject null) :read-only t))
 
+(defun cobject-eq (a b)
+  (cffi:pointer-eq (cobject-pointer a) (cobject-pointer b)))
+
 (defun cobject-class-object-size (type)
   (if-let ((type (nth-value 1 (cobject-class-definition type))))
     (cffi:foreign-type-size type)))

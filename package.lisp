@@ -2,6 +2,7 @@
   (:use #:cl #:alexandria)
   (:nicknames #:cobj)
   (:export #:cobject
+           #:cobject-eq
            #:cobject-pointer
            #:cpointer
            #:make-unmanaged-cpointer
