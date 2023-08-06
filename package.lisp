@@ -26,9 +26,6 @@
            #:creplace
            #:cfill
            #:carray-equal
-           #:define-struct-cobject
-           #:define-type-cobject
-           #:define-prototype-cobject
-           #:define-package-cobject))
+           #:define-cobject-class))
 
 (in-package #:cffi-object)

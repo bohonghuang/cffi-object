@@ -44,13 +44,13 @@
            (let ((*package* (symbol-package ,name)))
              ,@body))))))
 
-(defmacro define-prototype-cobject (desc)
+(defmacro define-prototype-cobject-class (desc)
   (with-parsed-desc (name type) desc
     (with-new-cobject-class-definition (name type)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
          (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition)))))
 
-(defmacro define-struct-cobject (desc)
+(defmacro define-struct-cobject-class (desc)
   (with-parsed-desc (name ctype) desc
     (let* ((type (cffi::ensure-parsed-base-type ctype))
            (slots (cffi:foreign-slot-names type)))
@@ -148,7 +148,7 @@
              (eval-when (:compile-toplevel :load-toplevel :execute)
                (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition))))))))
 
-(defmacro define-type-cobject (desc)
+(defmacro define-type-cobject-class (desc)
   (with-parsed-desc (name type) desc
     (let ((base-type (cffi::ensure-parsed-base-type type)))
       (with-new-cobject-class-definition (name type)
@@ -169,7 +169,7 @@
                (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition)))
           (error "Definition for the base type of ~A is not found." type))))))
 
-(defmacro define-package-cobject (desc)
+(defmacro define-package-cobject-classes (desc)
   (unless (listp desc)
     (setf desc (list desc)))
   (destructuring-bind (target &optional source) desc
@@ -185,20 +185,25 @@
                              (case (gethash type type-set)
                                (push
                                 (format t "Note: Found circular type reference, generating forward declaration for ~A.~%" name)
-                                (push `(define-prototype-cobject (,name ,type)) definitions))
+                                (push `(define-prototype-cobject-class (,name ,type)) definitions))
                                ((nil)
                                 (setf (gethash type type-set) 'push)
                                 (prog1 (typecase type
                                          (cffi::foreign-type-alias
                                           (push-definition (cffi::actual-type type))
                                           (when (typep (cffi::actual-type type) 'cffi::foreign-struct-type)
-                                            (push `(define-type-cobject (,name ,type)) definitions)))
+                                            (push `(define-type-cobject-class (,name ,type)) definitions)))
                                          (cffi::foreign-pointer-type
                                           (push-definition (cffi::pointer-type type)))
                                          (cffi::foreign-struct-type
                                           (mapc (compose #'push-definition #'cffi::parse-type #'cffi::slot-type)
                                                 (hash-table-values (cffi::slots type)))
-                                          (push `(define-struct-cobject (,name ,type)) definitions)))
+                                          (push `(define-struct-cobject-class (,name ,type)) definitions)))
                                   (setf (gethash type type-set) t))))))
                     (ignore-some-conditions (warning) (push-definition (funcall type-getter)))))
           :finally (return `(progn . ,(nreverse definitions))))))
+
+(defmacro define-cobject-class (desc)
+  (if (and (or (keywordp desc) (and (symbolp desc) (not (symbol-package desc)))) (find-package desc))
+      `(define-package-cobject-classes ,desc)
+      `(define-struct-cobject-class ,desc)))

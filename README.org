@@ -36,7 +36,7 @@ To test the system, simply eval ~(asdf:test-system :cffi-object)~ in the REPL.
       (x :float)
       (y :float))
 
-    (cobj:define-struct-cobject (vector2 (:struct vector2)))
+    (cobj:define-cobject-class (vector2 (:struct vector2)))
   #+END_SRC
 
   Or you can generate structure definitions for all the CFFI types declared in a package.
@@ -58,7 +58,7 @@ To test the system, simply eval ~(asdf:test-system :cffi-object)~ in the REPL.
       (rotation :float)
       (zoom :float))
 
-    (cobj:define-package-cobject #:mylib)
+    (cobj:define-cobject-class #:mylib)
   #+END_SRC
 
   Then you can create or modify objects of these types just like using structs defined with ~defstruct~:
@@ -173,7 +173,7 @@ To test the system, simply eval ~(asdf:test-system :cffi-object)~ in the REPL.
       (buffer (:array (:struct vector2) 64))
       (size :size))
 
-    (cobj:define-struct-cobject (:struct named-vector2-buffer))
+    (cobj:define-cobject-class (:struct named-vector2-buffer))
   #+END_SRC
 
   #+BEGIN_SRC lisp

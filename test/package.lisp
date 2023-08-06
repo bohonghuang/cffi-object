@@ -9,7 +9,7 @@
   (x :float)
   (y :float))
 
-(define-struct-cobject (vector2 (:struct vector2)))
+(define-cobject-class (vector2 (:struct vector2)))
 
 (define-test basic-struct :parent suite
   (foreign-free
@@ -37,7 +37,7 @@
   (rotation :float)
   (zoom :float))
 
-(define-struct-cobject (camera-2d (:struct camera-2d)))
+(define-cobject-class (camera-2d (:struct camera-2d)))
 
 (define-test struct-type-slot :parent suite
   ((lambda (vec)
@@ -129,7 +129,7 @@
   (sa-family :ushort)
   (sa-data (:array :char 14)))
 
-(define-struct-cobject (sockaddr (:struct sockaddr)))
+(define-cobject-class (sockaddr (:struct sockaddr)))
 
 (define-test primitive-type-array-in-struct :parent suite
   (let ((sockaddr (make-sockaddr))
@@ -157,7 +157,7 @@
   (left :float)
   (right :float))
 
-(define-struct-cobject (sample (:struct sample)))
+(define-cobject-class (sample (:struct sample)))
 
 (defcstruct sample-ring-buffer
   (data (:array (:struct sample) 2048))
@@ -166,7 +166,7 @@
   (free-count :size)
   (data-count :size))
 
-(define-struct-cobject (sample-ring-buffer (:struct sample-ring-buffer)))
+(define-cobject-class (sample-ring-buffer (:struct sample-ring-buffer)))
 
 (define-test object-array-in-struct :parent suite
   (loop :with ring-buffer := (make-sample-ring-buffer)
@@ -209,7 +209,7 @@
   (data (:pointer (:struct sample)))
   (size :size))
 
-(define-struct-cobject (sample-vector (:struct sample-vector)))
+(define-cobject-class (sample-vector (:struct sample-vector)))
 
 (define-test object-pointer-in-struct :parent suite
   (let* ((buffer (make-carray 4 :element-type 'sample))
@@ -222,7 +222,7 @@
 (defcstruct foreign-string
   (data :string))
 
-(define-struct-cobject (foreign-string (:struct foreign-string)))
+(define-cobject-class (foreign-string (:struct foreign-string)))
 
 (define-test string :parent suite
   (let ((str (make-foreign-string :data "Test")))
