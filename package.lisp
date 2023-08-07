@@ -26,6 +26,7 @@
            #:creplace
            #:cfill
            #:carray-equal
-           #:define-cobject-class))
+           #:define-cobject-class
+           #:define-global-cobject))
 
 (in-package #:cffi-object)

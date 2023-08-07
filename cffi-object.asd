@@ -15,8 +15,9 @@
                (:file "object")
                (:file "pointer")
                (:file "array")
-               (:file "macros"))
-  :depends-on (#:alexandria #:cffi #:trivial-garbage)
+               (:file "macros")
+               (:file "global"))
+  :depends-on (#:uiop #:alexandria #:cffi #:trivial-garbage)
   :in-order-to ((test-op (test-op #:cffi-object/test))))
 
 (defsystem cffi-object/test
