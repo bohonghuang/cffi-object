@@ -11,7 +11,7 @@
   (if-let ((type (nth-value 1 (cobject-class-definition type))))
     (cffi:foreign-type-size type)))
 
-(defun make-unmanaged-cobject (pointer type)
+(defun pointer-cobject (pointer type)
   (funcall
    (cobject-class-definition-internal-constructor
     (cobject-class-definition type))
@@ -24,6 +24,3 @@
 (defun unmanage-cobject (cobject)
   (tg:cancel-finalization cobject)
   (cobject-pointer cobject))
-
-(defun make-managed-cobject (pointer type)
-  (manage-cobject (make-unmanaged-cobject pointer type)))

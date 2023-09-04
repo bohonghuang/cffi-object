@@ -10,9 +10,6 @@
             (constructor (symbolicate '#:make- ,name))
             (internal-constructor (symbolicate '#:%%make- ,name))
             (copier (symbolicate '#:copy- ,name))
-            (managed-constructor (symbolicate '#:make-managed- ,name))
-            (unmanaged-constructor (symbolicate '#:make-unmanaged- ,name))
-            (unmanaged-pointer-accessor (symbolicate '#:unmanange- ,name))
             (slot-accessors (mapcar #'cons ,slots (mapcar (curry #'symbolicate ,name '#:-) ,slots)))
             (cobject-class-definition `(make-cobject-class-definition :class ',name
                                                                       :constructor ',constructor
@@ -20,10 +17,7 @@
                                                                       :slot-accessors ',slot-accessors
                                                                       :copier ',copier
                                                                       :predicate ',predicate
-                                                                      :equality-comparator ',equality-comparator
-                                                                      :managed-constructor ',managed-constructor
-                                                                      :unmanaged-constructor ',unmanaged-constructor
-                                                                      :unmanaged-pointer-accessor ',unmanaged-pointer-accessor)))
+                                                                      :equality-comparator ',equality-comparator)))
        (declare (ignorable cobject-class-definition))
        . ,body)))
 
@@ -124,14 +118,6 @@
                  (check-type ,destination ,name)
                  (memcpy (cobject-pointer ,destination) (cobject-pointer ,instance) (cffi:foreign-type-size ',type))
                  ,destination)
-               (eval-when (:compile-toplevel :load-toplevel :execute)
-                 (setf (fdefinition ',unmanaged-pointer-accessor) (fdefinition 'unmanage-cobject)))
-               (declaim (inline ,unmanaged-constructor))
-               (defun ,unmanaged-constructor (,pointer)
-                 (,internal-constructor :pointer ,pointer))
-               (declaim (inline ,managed-constructor))
-               (defun ,managed-constructor (,pointer)
-                 (manage-cobject (,unmanaged-constructor ,pointer)))
                (defmethod print-object ((,instance ,name) ,stream)
                  (print-unreadable-object (,instance ,stream)
                    (princ ,(string name) ,stream)
@@ -154,9 +140,6 @@
                    (fdefinition ',constructor) (fdefinition ',(cobject-class-definition-constructor definition))
                    (fdefinition ',internal-constructor) (fdefinition ',(cobject-class-definition-internal-constructor definition))
                    (fdefinition ',copier) (fdefinition ',(cobject-class-definition-copier definition))
-                   (fdefinition ',managed-constructor) (fdefinition ',(cobject-class-definition-managed-constructor definition))
-                   (fdefinition ',unmanaged-constructor) (fdefinition ',(cobject-class-definition-unmanaged-constructor definition))
-                   (fdefinition ',unmanaged-pointer-accessor) (fdefinition ',(cobject-class-definition-unmanaged-pointer-accessor definition))
                    . ,(mapcan
                        (lambda (var val)
                          `((fdefinition ',(cdr var)) (fdefinition ',(cdr val))

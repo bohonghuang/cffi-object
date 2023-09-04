@@ -28,7 +28,7 @@
               (is = 2.0 (vector2-y vec2))
               (is = 1.0 (vector2-x vec3))
               (is = 2.0 (vector2-y vec3)))
-            (unmanange-vector2 vec1))
+            (unmanage-cobject vec1))
      (tg:gc :full t))))
 
 (defcstruct camera-2d
@@ -138,17 +138,17 @@
         (addr (make-carray 4 :element-type '(unsigned-byte 8)
                              :initial-contents #(192 168 31 1))))
     (creplace (sockaddr-sa-data sockaddr)
-              (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2)
+              (pointer-carray (cobject-pointer port) '(signed-byte 8) 2)
               :start1 0)
     (creplace (sockaddr-sa-data sockaddr)
-              (make-unmanaged-carray (cobject-pointer addr) '(signed-byte 8) 4)
+              (pointer-carray (cobject-pointer addr) '(signed-byte 8) 4)
               :start1 2)
     (is carray-equal
-        (make-unmanaged-carray (cobject-pointer port) '(signed-byte 8) 2)
+        (pointer-carray (cobject-pointer port) '(signed-byte 8) 2)
         (make-carray 2 :element-type '(signed-byte 8)
                        :displaced-to (sockaddr-sa-data sockaddr)
                        :displaced-index-offset 0))
-    (loop :with addr := (make-managed-carray (unmanage-carray addr) '(signed-byte 8) 4)
+    (loop :with addr := (manage-cobject (pointer-carray (unmanage-cobject addr) '(signed-byte 8) 4))
           :for i :below 4
           :for j :from 2
           :do (is = (caref addr i) (caref (sockaddr-sa-data sockaddr) j)))))
@@ -182,7 +182,7 @@
   (let* ((arr1 (make-carray 2 :element-type '(carray sample 2)
                               :initial-element (make-carray 2 :element-type 'sample
                                                               :initial-element (make-sample :left 0.5 :right 1.0)))) 
-         (arr2 (make-unmanaged-carray (cobject-pointer arr1) 'sample 4)))
+         (arr2 (pointer-carray (cobject-pointer arr1) 'sample 4)))
     (loop :for i :below 4
           :for sample := (make-sample :left (/ i 3.0) :right (- (/ i 3.0)))
           :do (setf (caref arr2 i) sample)
@@ -193,15 +193,15 @@
   (let* ((pptr (foreign-alloc :pointer))
          (ptr (setf (mem-ref pptr :pointer) (foreign-alloc :uint32)))
          (value (setf (mem-ref ptr :uint32) 12345))
-         (cpptr (make-managed-cpointer pptr '(cpointer (unsigned-byte 32))))
-         (cptr (make-managed-cpointer ptr '(unsigned-byte 32))))
+         (cpptr (manage-cobject (pointer-cpointer pptr '(cpointer (unsigned-byte 32)))))
+         (cptr (manage-cobject (pointer-cpointer ptr '(unsigned-byte 32)))))
     (is cpointer-eq (cref cpptr) cptr)
     (is = value (cref (cref cpptr)))
     (is = value (cref cptr))))
 
 (define-test array-pointer :parent suite
   (let* ((arr1 (make-carray 2048 :element-type 'sample))
-         (arr2 (cref (make-unmanaged-cpointer (cobject-pointer arr1) '(carray sample 2048)))))
+         (arr2 (cref (pointer-cpointer (cobject-pointer arr1) '(carray sample 2048)))))
     (is carray-equal arr1 arr2)
     (is pointer-eq (cobject-pointer arr1) (cobject-pointer arr2))))
 
@@ -213,7 +213,7 @@
 
 (define-test object-pointer-in-struct :parent suite
   (let* ((buffer (make-carray 4 :element-type 'sample))
-         (buffer-pointer (make-unmanaged-cpointer (cobject-pointer buffer) 'sample))
+         (buffer-pointer (pointer-cpointer (cobject-pointer buffer) 'sample))
          (vector1 (make-sample-vector :data buffer :size 4))
          (vector2 (make-sample-vector :data buffer-pointer :size 4)))
     (is cpointer-eq buffer-pointer (sample-vector-data vector1))
@@ -237,9 +237,9 @@
 (define-test array-of-pointer :parent suite
   (let ((arr (make-carray 3 :element-type '(carray (cpointer (signed-byte 8)) 1)
                             :initial-element (make-carray 1 :element-type '(cpointer (signed-byte 8))
-                                                            :initial-element (make-unmanaged-cpointer (cffi-sys::make-pointer 123) '(signed-byte 8))))))
+                                                            :initial-element (pointer-cpointer (cffi-sys::make-pointer 123) '(signed-byte 8))))))
     (loop :for i :below 3
-          :do (is cpointer-eq (caref (caref arr i) 0) (make-unmanaged-cpointer (make-pointer 123) '(signed-byte 8))))))
+          :do (is cpointer-eq (caref (caref arr i) 0) (pointer-cpointer (make-pointer 123) '(signed-byte 8))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (cobj.ops:enable-cobject-ops))

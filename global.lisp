@@ -10,7 +10,7 @@
         :for (ctype . definition) := (rassoc (class-name class) definitions :key #'cobject-class-definition-class)
         :for constructor := (cobject-class-definition-constructor definition)
         :for size := (cffi:foreign-type-size ctype)
-        :nconc (carray-list (make-unmanaged-carray (cobject-pointer cobject) '(unsigned-byte 8) size)) :into data
+        :nconc (carray-list (pointer-carray (cobject-pointer cobject) '(unsigned-byte 8) size)) :into data
         :collect (let ((constructor (fdefinition constructor)) (size size)
                        (offset offset) (symbol name))
                    (lambda (bytes)

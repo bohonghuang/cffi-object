@@ -109,14 +109,9 @@
                 initial-contents)))))
     array))
 
-(defun make-unmanaged-carray (pointer element-type dimensions)
+(defun pointer-carray (pointer element-type dimensions)
   (unless (listp dimensions) (setf dimensions (list dimensions)))
   (%make-carray :pointer pointer :dimensions dimensions :element-type element-type))
-
-(defun make-managed-carray (pointer element-type dimensions)
-  (manage-cobject (make-unmanaged-carray pointer element-type dimensions)))
-
-(setf (fdefinition 'unmanage-carray) (fdefinition 'unmanage-cobject))
 
 (defun creplace (target-carray1 source-carray2
                  &key

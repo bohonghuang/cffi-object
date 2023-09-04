@@ -43,10 +43,5 @@
 (defun cpointer-eq (pointer1 pointer2)
   (cffi:pointer-eq (cobject-pointer pointer1) (cobject-pointer pointer2)))
 
-(defun make-unmanaged-cpointer (pointer element-type)
+(defun pointer-cpointer (pointer element-type)
   (%make-cpointer :pointer pointer :element-type element-type))
-
-(defun make-managed-cpointer (pointer element-type)
-  (manage-cobject (make-unmanaged-cpointer pointer element-type)))
-
-(setf (fdefinition 'unmanage-cpointer) (fdefinition 'unmanage-cobject))

@@ -150,13 +150,16 @@ To test the system, simply eval ~(asdf:test-system :cffi-object)~ in the REPL.
     (cffi:defcfun free :void                ; cffi:foreign-free
       (size :pointer))
 
-    (let* ((vec1 (make-managed-vector2      ; Take ownership of the object from foreign and responsible for freeing the memory.
-                  (malloc (cffi:foreign-type-size
-                           '(:struct vector2)))))
-           (vec2 (make-unmanaged-vector2    ; Share the memory of this object with foreign and not responsible for freeing the memory.
-                  (cobj:cobject-pointer vec1))))
+    (let* ((vec1 (cobj:manage-cobject       ; Take ownership of the object from foreign and responsible for freeing the memory.
+                  (cobj:pointer-cobject   
+                   (malloc (cffi:foreign-type-size
+                            '(:struct vector2)))
+                   'vector2)))
+           (vec2 (cobj:pointer-cobject      ; Share the memory of this object with foreign and not responsible for freeing the memory.
+                  (cobj:cobject-pointer vec1)
+                  'vector2)))
       (assert (vector2-equal vec1 vec2))
-      (free (unmanange-vector2 vec1)))      ; Transfer ownership of the object to foreign and no longer responsible for freeing its memory.
+      (free (cobj:unmanage-cobject vec1)))  ; Transfer ownership of the object to foreign and no longer responsible for freeing its memory.
   #+END_SRC
 
   But when you transfer the deallocation of memory to foreign code, you should be aware that the memory of this object may become invalid at any time

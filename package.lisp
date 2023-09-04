@@ -5,17 +5,13 @@
            #:cobject-eq
            #:cobject-pointer
            #:cpointer
-           #:make-unmanaged-cpointer
-           #:make-managed-cpointer
-           #:unmanage-cpointer
+           #:pointer-cpointer
            #:cref
            #:cpointer-equal
            #:cpointer-eq
            #:carray
            #:make-carray
-           #:make-unmanaged-carray
-           #:make-managed-carray
-           #:unmanage-carray
+           #:pointer-carray
            #:carray-dimensions
            #:carray-displacement
            #:carray-element-type
@@ -27,6 +23,9 @@
            #:cfill
            #:carray-equal
            #:define-cobject-class
-           #:define-global-cobject))
+           #:define-global-cobject
+           #:pointer-cobject
+           #:manage-cobject
+           #:unmanage-cobject))
 
 (in-package #:cffi-object)
