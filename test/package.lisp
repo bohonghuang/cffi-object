@@ -14,7 +14,7 @@
 (define-test basic-struct :parent suite
   (foreign-free
    (prog1 (let ((vec1 (make-vector2 :x 1.0 :y 2.0)))
-            (let ((vec2 (copy-vector2-into vec1 (make-vector2)))
+            (let ((vec2 (copy-vector2 vec1 (make-vector2)))
                   (vec3 (copy-vector2 vec1)))
               (is = 1.0 (vector2-x vec1))
               (is = 2.0 (vector2-y vec1))

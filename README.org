@@ -83,7 +83,7 @@ To test the system, simply eval ~(asdf:test-system :cffi-object)~ in the REPL.
     #<VECTOR2 :X 1.0 :Y 2.0 @0x00007F3C840011D0>
     MYLIB> (setf (vector2-x *) 2.0)
     2.0
-    MYLIB> (copy-vector2-into ** ***)
+    MYLIB> (copy-vector2 ** ***) ; In-place copy
     #<VECTOR2 :X 2.0 :Y 2.0 @0x00007F3C840011B0>
     MYLIB> (vector2-equal * ***)
     T

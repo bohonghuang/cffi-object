@@ -10,7 +10,6 @@
             (constructor (symbolicate '#:make- ,name))
             (internal-constructor (symbolicate '#:%%make- ,name))
             (copier (symbolicate '#:copy- ,name))
-            (inplace-copier (symbolicate '#:copy- ,name '#:-into))
             (managed-constructor (symbolicate '#:make-managed- ,name))
             (unmanaged-constructor (symbolicate '#:make-unmanaged- ,name))
             (unmanaged-pointer-accessor (symbolicate '#:unmanange- ,name))
@@ -20,7 +19,6 @@
                                                                       :internal-constructor ',internal-constructor
                                                                       :slot-accessors ',slot-accessors
                                                                       :copier ',copier
-                                                                      :inplace-copier ',inplace-copier
                                                                       :predicate ',predicate
                                                                       :equality-comparator ',equality-comparator
                                                                       :managed-constructor ',managed-constructor
@@ -120,19 +118,12 @@
                      (zerop (memcmp (cobject-pointer ,instance1)
                                     (cobject-pointer ,instance2)
                                     (cffi:foreign-type-size ',type)))))
-               (declaim (inline ,inplace-copier))
-               (defun ,inplace-copier (,instance ,destination)
+               (declaim (inline ,copier))
+               (defun ,copier (,instance &optional (,destination (manage-cobject (,internal-constructor :pointer (cffi:foreign-alloc ',type)))))
                  (check-type ,instance ,name)
                  (check-type ,destination ,name)
                  (memcpy (cobject-pointer ,destination) (cobject-pointer ,instance) (cffi:foreign-type-size ',type))
                  ,destination)
-               (declaim (inline ,copier))
-               (defun ,copier (,instance)
-                 (check-type ,instance ,name)
-                 (let* ((,pointer (cffi:foreign-alloc ',type))
-                        (,destination (,internal-constructor :pointer ,pointer)))
-                   (manage-cobject
-                    (,inplace-copier ,instance ,destination))))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (setf (fdefinition ',unmanaged-pointer-accessor) (fdefinition 'unmanage-cobject)))
                (declaim (inline ,unmanaged-constructor))
@@ -163,7 +154,6 @@
                    (fdefinition ',constructor) (fdefinition ',(cobject-class-definition-constructor definition))
                    (fdefinition ',internal-constructor) (fdefinition ',(cobject-class-definition-internal-constructor definition))
                    (fdefinition ',copier) (fdefinition ',(cobject-class-definition-copier definition))
-                   (fdefinition ',inplace-copier) (fdefinition ',(cobject-class-definition-inplace-copier definition))
                    (fdefinition ',managed-constructor) (fdefinition ',(cobject-class-definition-managed-constructor definition))
                    (fdefinition ',unmanaged-constructor) (fdefinition ',(cobject-class-definition-unmanaged-constructor definition))
                    (fdefinition ',unmanaged-pointer-accessor) (fdefinition ',(cobject-class-definition-unmanaged-pointer-accessor definition))
