@@ -41,4 +41,4 @@
 (defmacro define-global-cobject (name val-form)
   `(progn
      (setf (assoc-value *global-cobjects* ',name) (lambda () ,val-form))
-     (defparameter ,name ,val-form)))
+     (global-vars:define-global-var ,name ,val-form)))
