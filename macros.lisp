@@ -46,7 +46,8 @@
   (let ((options (reduce #'append options)))
     (with-parsed-desc (name ctype) desc
       (let* ((type (cffi::ensure-parsed-base-type ctype))
-             (slots (cffi:foreign-slot-names type)))
+             (slots (cffi:foreign-slot-names type))
+             (slot-supplied-p-list (mapcar (compose #'gensym #'symbol-name) slots)))
         (with-new-cobject-class-definition (name ctype)
           (when-let ((constructor-option (getf options :constructor)))
             (setf (getf (cdr cobject-class-definition) :constructor) `',(setf constructor constructor-option)))
@@ -99,11 +100,12 @@
                                       `(setf ,slot-value (cobject-pointer ,value)))
                                      (t `(setf ,slot-value ,value))))))
                (declaim (inline ,constructor))
-               (defun ,constructor (&key . ,slots)
+               (defun ,constructor (&key . ,(mapcar #'list slots (mapcar (constantly nil) slots) slot-supplied-p-list))
                  (let* ((,pointer (cffi:foreign-alloc ',type))
                         (,instance (,internal-constructor :pointer ,pointer)))
                    ,@(loop :for slot :in slots
-                           :collect `(when ,slot
+                           :for slot-supplied-p :in slot-supplied-p-list
+                           :collect `(when ,slot-supplied-p
                                        (setf (,(assoc-value slot-accessors slot) ,instance) ,slot)))
                    (manage-cobject ,instance)))
                (declaim (inline ,equality-comparator))
