@@ -31,7 +31,15 @@
   (if-let ((cons (find type *cobject-class-definitions* :key (compose #'cobject-class-definition-class #'cdr))))
     (values (cdr cons) (car cons))
     (if-let ((primitive-type (primitive-type-p type)))
-      (values nil primitive-type)
+      (values
+       (case primitive-type
+         (:char (make-cobject-class-definition
+                 :class type
+                 :internal-constructor (lambda (&key pointer shared-from)
+                                         (declare (ignore shared-from))
+                                         (code-char (mod (cffi:mem-aref pointer :char) 255)))))
+         (t nil))
+       primitive-type)
       (if (listp type)
           (symbol-macrolet ((as-array (values (make-cobject-class-definition
                                                :class type

@@ -18,6 +18,7 @@
       (case type
         (single-float :float)
         (double-float :double)
+        (character :char)
         (string :string))))
 
 (defun cobject-type= (type1 type2)

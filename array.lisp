@@ -14,17 +14,24 @@
     (error "Index ~D is out of bound." subscript))
   (setf (cref array subscript) value))
 
+(declaim (inline clength)
+         (ftype (function (carray) non-negative-fixnum) clength))
+(defun clength (carray)
+  (first (carray-dimensions carray)))
+
 (defmethod print-object ((array carray) stream)
   (print-unreadable-object (array stream)
-    (loop :with length := (first (carray-dimensions array))
-          :for i :below length
-          :if (< i 10)
-            :unless (zerop i)
-              :do (format stream "~%  ")
-            :end
-            :and :do (prin1 (caref array i) stream)
-          :else
-            :return (format stream " ... [~D elements elided]" (- length 10)))))
+    (case (carray-element-type array)
+      (character (tagbody (write-char #\" stream) (carray-string array) (write-char #\" stream)))
+      (t (loop :with length := (first (carray-dimensions array))
+               :for i :below length
+               :if (< i 10)
+                 :unless (zerop i)
+                   :do (format stream "~%  ")
+               :end
+               :and :do (prin1 (caref array i) stream)
+               :else
+                 :return (format stream " ... [~D elements elided]" (- length 10)))))))
 
 (defstruct (displaced-carray (:include carray)
                              (:constructor %make-displaced-carray))
@@ -40,10 +47,11 @@
              (displaced-carray-displaced-index-offset array)))
     (t (values nil nil))))
 
-(declaim (inline clength)
-         (ftype (function (carray) non-negative-fixnum) clength))
-(defun clength (carray)
-  (first (carray-dimensions carray)))
+(defun carray-string (carray)
+  (cffi:foreign-string-to-lisp (carray-pointer carray)))
+
+(defun (setf carray-string) (value carray)
+  (cffi:lisp-string-to-foreign value (carray-pointer carray) (clength carray)))
 
 (defun make-carray (dimensions
                     &key element-type
@@ -54,6 +62,7 @@
     (setf dimensions (list dimensions)))
   (let* ((primitive-type-p (primitive-type-p element-type))
          (pointer-type-p (and (listp element-type) (eq (first element-type) 'cpointer)))
+         (character-type-p (eq element-type 'character))
          (element-size (cobject-class-object-size element-type))
          (total-size (* element-size (reduce #'* dimensions)))
          (pointer (if displaced-to (cffi:inc-pointer (cobject-pointer displaced-to) (* element-size displaced-index-offset))
@@ -74,6 +83,8 @@
       (assert (null initial-contents))
       (assert (null displaced-to))
       (cond
+        (character-type-p
+         (memset pointer (char-code initial-element) total-size))
         (primitive-type-p
          (loop :for i :of-type fixnum :below (first dimensions)
                :do (setf (cffi:mem-aref pointer primitive-type-p i) initial-element)))
@@ -91,9 +102,13 @@
          (assert (equal dimensions (carray-dimensions initial-contents)))
          (memcpy pointer (cobject-pointer initial-contents) total-size))
         (sequence
-         (assert (= (first dimensions) (length initial-contents)))
+         (unless character-type-p
+           (assert (= (first dimensions) (length initial-contents))))
          (let ((i 0))
            (map nil (cond
+                      (character-type-p
+                       (cffi:lisp-string-to-foreign (coerce initial-contents 'string) pointer total-size)
+                       (return-from make-carray array))
                       (primitive-type-p
                        (lambda (object)
                          (setf (cffi:mem-aref pointer primitive-type-p i) object)
@@ -142,8 +157,7 @@
 
 (declaim (ftype (function (carray) (values simple-array)) carray-array))
 (defun carray-array (carray)
-  (loop :with length := (clength carray)
-        :with array := (make-array length)
-        :for i :below length
-        :do (setf (aref array i) (caref carray i))
-        :finally (return array)))
+  (if (symbolp (carray-element-type carray))
+      (make-array (clength carray) :element-type (carray-element-type carray)
+                                   :initial-contents (carray-list carray))
+      (make-array (clength carray) :initial-contents (carray-list carray))))

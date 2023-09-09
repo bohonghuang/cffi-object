@@ -8,7 +8,7 @@
   (cffi:pointer-eq (cobject-pointer a) (cobject-pointer b)))
 
 (defun cobject-class-object-size (type)
-  (if-let ((type (nth-value 1 (cobject-class-definition type))))
+  (when-let ((type (nth-value 1 (cobject-class-definition type))))
     (cffi:foreign-type-size type)))
 
 (defun pointer-cobject (pointer type)

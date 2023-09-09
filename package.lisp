@@ -17,6 +17,7 @@
            #:carray-element-type
            #:carray-list
            #:carray-array
+           #:carray-string
            #:caref
            #:clength
            #:creplace

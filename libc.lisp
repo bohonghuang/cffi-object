@@ -11,3 +11,9 @@
   (s1 :pointer)
   (s2 :pointer)
   (n :size))
+
+(declaim (inline memset))
+(cffi:defcfun "memset" :int
+  (s :pointer)
+  (c :int)
+  (n :size))
