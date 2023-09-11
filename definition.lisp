@@ -3,11 +3,11 @@
 (defstruct cobject-class-definition
   (class nil :type (or symbol list))
   (internal-constructor nil :type (or symbol function))
-  (constructor nil :type symbol)
+  (constructor nil :type (or symbol function))
   (slot-accessors nil :type list)
-  (copier nil :type symbol)
-  (predicate nil :type symbol)
-  (equality-comparator nil :type symbol))
+  (copier nil :type (or symbol function))
+  (predicate nil :type (or symbol function))
+  (equality-comparator nil :type (or symbol function)))
 
 (defun cobject-class-definition-symbols (definition &optional internalp)
   (remove-if-not
@@ -37,7 +37,11 @@
                  :class type
                  :internal-constructor (lambda (&key pointer shared-from)
                                          (declare (ignore shared-from))
-                                         (code-char (mod (cffi:mem-aref pointer :char) 255)))))
+                                         (values (code-char (mod (cffi:mem-aref pointer :char) 255)) pointer))
+                 :copier (lambda (src dest &optional pointer)
+                           (declare (ignore dest))
+                           (when pointer (setf (cffi:mem-aref pointer :char) (char-code src)))
+                           (values src))))
          (t nil))
        primitive-type)
       (if (listp type)

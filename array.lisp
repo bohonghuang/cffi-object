@@ -21,17 +21,21 @@
 
 (defmethod print-object ((array carray) stream)
   (print-unreadable-object (array stream)
-    (case (carray-element-type array)
-      (character (tagbody (write-char #\" stream) (carray-string array) (write-char #\" stream)))
-      (t (loop :with length := (first (carray-dimensions array))
-               :for i :below length
-               :if (< i 10)
-                 :unless (zerop i)
-                   :do (format stream "~%  ")
-               :end
-               :and :do (prin1 (caref array i) stream)
-               :else
-                 :return (format stream " ... [~D elements elided]" (- length 10)))))))
+    (loop :named print-element-loop
+          :with length := (first (carray-dimensions array))
+          :initially
+             (case (carray-element-type array)
+               (character (ignore-errors
+                           (return-from print-element-loop
+                             (print-object (carray-string array) stream)))))
+          :for i :below length
+          :if (< i 10)
+            :unless (zerop i)
+              :do (format stream "~%  ")
+          :end
+          :and :do (prin1 (caref array i) stream)
+          :else
+            :return (format stream " ... [~D elements elided]" (- length 10)))))
 
 (defstruct (displaced-carray (:include carray)
                              (:constructor %make-displaced-carray))

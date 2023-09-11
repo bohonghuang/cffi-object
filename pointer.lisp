@@ -26,11 +26,11 @@
     (if definition
         (let* ((element-size (cffi:foreign-type-size type))
                (pointer (cffi:inc-pointer (cobject-pointer cpointer) (* element-size subscript))))
-          (memcpy pointer (cobject-pointer value) element-size)
-          (funcall
-           (cobject-class-definition-internal-constructor definition)
-           :pointer pointer
-           :shared-from cpointer))
+          (multiple-value-call (cobject-class-definition-copier definition)
+            value (funcall
+                   (cobject-class-definition-internal-constructor definition)
+                   :pointer pointer
+                   :shared-from cpointer)))
         (setf (cffi:mem-aref (cobject-pointer cpointer) type subscript) value))))
 
 (defun cpointer-equal (pointer1 pointer2 &optional (count 1))

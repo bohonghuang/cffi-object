@@ -258,3 +258,21 @@
       (of-type foreign-pointer (& cam))
       (of-type foreign-pointer (& cam2)))
     (of-type foreign-pointer (& cam))))
+
+(define-test character-array :parent suite
+  (let ((arr (make-carray 10 :element-type 'character)))
+    (loop :for c :across "Hello"
+          :for i :from 0
+          :do (setf (caref arr i) c)
+          :finally (setf (caref arr 5) #\Nul))
+    (is string= "Hello" (carray-string arr))
+    (is = 10 (length (carray-list arr)))
+    (is string= "Hello" (coerce (subseq (carray-list arr) 0 5) 'string))
+    (setf (carray-string arr) "World")
+    (is string= "World" (carray-string arr)))
+  (let ((arr (make-carray 5 :element-type 'character :initial-contents "Hello World!")))
+    (is string= "Hell" (carray-string arr)))
+  (let ((arr (make-carray 20 :element-type 'character :initial-contents "Hello World!")))
+    (is string= "Hello World!" (carray-string arr)))
+  (let ((arr (make-carray 20 :element-type 'character :initial-element #\Nul)))
+    (is string= "" (carray-string arr))))
