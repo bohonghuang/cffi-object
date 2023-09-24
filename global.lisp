@@ -38,7 +38,9 @@
 
 (pushnew 'save-global-cobjects uiop:*image-dump-hook*)
 
+(defparameter *define-global-cobject* 'defparameter)
+
 (defmacro define-global-cobject (name val-form)
   `(progn
      (setf (assoc-value *global-cobjects* ',name) (lambda () ,val-form))
-     (global-vars:define-global-var ,name ,val-form)))
+     (,*define-global-cobject* ,name ,val-form)))

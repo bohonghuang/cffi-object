@@ -25,6 +25,7 @@
            #:carray-equal
            #:define-cobject-class
            #:define-global-cobject
+           #:*define-global-cobject*
            #:pointer-cobject
            #:manage-cobject
            #:unmanage-cobject))
