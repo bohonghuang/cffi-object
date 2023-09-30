@@ -1,5 +1,6 @@
 (in-package #:cffi-object)
 
+(declaim (inline make-cobject))
 (defstruct cobject
   (pointer (cffi:null-pointer) :type cffi:foreign-pointer :read-only t)
   (shared-from nil :type (or cobject null) :read-only t))

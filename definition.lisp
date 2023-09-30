@@ -4,6 +4,7 @@
   (class nil :type (or symbol list))
   (internal-constructor nil :type (or symbol function))
   (constructor nil :type (or symbol function))
+  (in-place-constructor nil :type (or symbol function))
   (slot-accessors nil :type list)
   (copier nil :type (or symbol function))
   (predicate nil :type (or symbol function))
