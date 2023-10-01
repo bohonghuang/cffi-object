@@ -53,7 +53,7 @@
         (with-new-cobject-class-definition (name ctype)
           (when-let ((constructor-option (getf options :constructor)))
             (setf (getf (cdr cobject-class-definition) :constructor) `',(setf constructor constructor-option)))
-          (with-gensyms (pointer instance value stream destination args arg arg-name)
+          (with-gensyms (pointer instance value stream destination)
             `(progn
                (declaim (inline ,internal-constructor))
                (defstruct (,name
@@ -118,23 +118,14 @@
                                          (setf (,(assoc-value slot-accessors slot) ,instance) ,slot)))
                    ,pointer))
                (declaim (inline ,constructor))
-               (defun ,constructor (&rest ,args &key . ,slots)
-                 (declare (dynamic-extent ,args) (ignore . ,slots))
-                 ,(let ((slot-value-forms (loop :for slot :in slots
-                                                :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot))
-                                                :for slot-supplied-p :in slot-supplied-p-list
-                                                :for slot-name := (make-keyword slot)
-                                                :if (typep slot-type '(or cffi::foreign-struct-type cffi::foreign-array-type cffi::foreign-pointer-type))
-                                                  :collect `(,slot-name (cobject-pointer ,value))
-                                                :else
-                                                  :collect `(,slot-name ,value))))
-                    (when (some (compose #'consp #'second) slot-value-forms)
-                      `(loop :for ,arg :on ,args :by #'cddr
-                             :for (,arg-name ,value) := ,arg
-                             :do (setf (cadr ,arg) (ecase ,arg-name . ,slot-value-forms)))))
-                 (let* ((,pointer (cffi:foreign-alloc ',type))
+               (defun ,constructor (&key . ,(mapcar #'list slots (mapcar (constantly nil) slots) slot-supplied-p-list))
+                 (let* ((,pointer (funcall (foreign-allocator-allocator *foreign-allocator*) (cffi:foreign-type-size ',type)))
                         (,instance (,internal-constructor :pointer ,pointer)))
-                   (apply #',in-place-constructor ,pointer ,args)
+                   ,@(loop :for slot :in slots
+                           :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot))
+                           :for slot-supplied-p :in slot-supplied-p-list                  
+                           :collect `(when ,slot-supplied-p
+                                       (setf (,(assoc-value slot-accessors slot) ,instance) ,slot)))
                    (manage-cobject ,instance)))
                (declaim (inline ,equality-comparator))
                ,(with-gensyms (instance1 instance2)
@@ -143,7 +134,7 @@
                                     (cobject-pointer ,instance2)
                                     (cffi:foreign-type-size ',type)))))
                (declaim (inline ,copier))
-               (defun ,copier (,instance &optional (,destination (manage-cobject (,internal-constructor :pointer (cffi:foreign-alloc ',type)))))
+               (defun ,copier (,instance &optional (,destination (manage-cobject (,internal-constructor :pointer (funcall (foreign-allocator-allocator *foreign-allocator*) (cffi:foreign-type-size ',type))))))
                  (check-type ,instance ,name)
                  (check-type ,destination ,name)
                  (memcpy (cobject-pointer ,destination) (cobject-pointer ,instance) (cffi:foreign-type-size ',type))

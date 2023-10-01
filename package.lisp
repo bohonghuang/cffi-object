@@ -28,6 +28,7 @@
            #:*define-global-cobject*
            #:pointer-cobject
            #:manage-cobject
-           #:unmanage-cobject))
+           #:unmanage-cobject
+           #:with-monotonic-buffer-allocator))
 
 (in-package #:cffi-object)

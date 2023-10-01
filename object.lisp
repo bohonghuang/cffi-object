@@ -19,8 +19,9 @@
    :pointer pointer))
 
 (defun manage-cobject (cobject)
-  (let ((pointer (cobject-pointer cobject)))
-    (tg:finalize cobject (lambda () (cffi:foreign-free pointer)))))
+  (let ((pointer (cobject-pointer cobject))
+        (deallocator (foreign-allocator-deallocator *foreign-allocator*)))
+    (tg:finalize cobject (lambda () (funcall deallocator pointer)))))
 
 (defun unmanage-cobject (cobject)
   (tg:cancel-finalization cobject)

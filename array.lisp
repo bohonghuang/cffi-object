@@ -70,7 +70,7 @@
          (element-size (cobject-class-object-size element-type))
          (total-size (* element-size (reduce #'* dimensions)))
          (pointer (if displaced-to (cffi:inc-pointer (cobject-pointer displaced-to) (* element-size displaced-index-offset))
-                      (cffi:foreign-alloc :uint8 :count total-size)))
+                      (funcall (foreign-allocator-allocator *foreign-allocator*) total-size)))
          (array (if displaced-to
                     (progn
                       (assert (<= 0 displaced-index-offset (+ displaced-index-offset (first dimensions)) (first (carray-dimensions displaced-to))))

@@ -12,6 +12,7 @@
                (:file "libc")
                (:file "type")
                (:file "definition")
+               (:file "allocator")
                (:file "object")
                (:file "pointer")
                (:file "array")
