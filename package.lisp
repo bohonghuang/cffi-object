@@ -29,6 +29,7 @@
            #:pointer-cobject
            #:manage-cobject
            #:unmanage-cobject
-           #:with-monotonic-buffer-allocator))
+           #:with-monotonic-buffer-allocator
+           #:defcobjfun))
 
 (in-package #:cffi-object)
