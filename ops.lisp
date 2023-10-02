@@ -9,12 +9,16 @@
 
 (defconstant +ctypes-slots+ (fdefinition 'cffi-ops::ctypes-slots))
 
+(setf (fdefinition 'cobj::funcall-dynamic-extent-form) (fdefinition 'cffi-ops::funcall-dynamic-extent-form))
+
 (defun ctypes-slots-with-cobject (types)
   (funcall +ctypes-slots+ (mapcar (lambda (type)
                                     (if (and (listp type) (eq (car type) :object))
                                         (cons :pointer (cdr type))
                                         type))
                                   types)))
+
+(defgeneric funcall-form-type (function args))
 
 (defun form-type-with-object-unwrapped (form)
   (multiple-value-bind (type form) (funcall +form-type+ form)
