@@ -40,17 +40,26 @@
     (setf allocator-1 allocator-2)
     allocator-2))
 
-(defmacro with-monotonic-buffer-allocator ((&key (size 128) (upstream '*foreign-allocator*) (values '#'values)) &body body)
-  (with-gensyms (buffer pointer size-var allocator)
-    `(let* ((,size-var ,size)
-            (,buffer (cffi:make-shareable-byte-vector ,size-var)))
-       (declare (dynamic-extent ,buffer))
-       (cffi:with-pointer-to-vector-data (,pointer ,buffer)
-         (let ((,allocator (make-sized-monotonic-buffer-allocator :pointer ,pointer :size ,size-var :upstream ,upstream)))
-           (declare (dynamic-extent ,allocator))
-           (multiple-value-call ,values
-             (let ((*foreign-allocator* ,allocator))
-               ,@body)))))))
+(defmacro with-monotonic-buffer-allocator ((&key
+                                              buffer
+                                              (size (if buffer `(length ,buffer) 128))
+                                              (upstream '*foreign-allocator*)
+                                              (values '#'values))
+                                           &body body)
+  (with-gensyms (buffer-var pointer size-var allocator)
+    (flet ((wrap-with-buffer-var (form)
+            (if buffer
+                `(let ((,buffer-var ,buffer)) ,form)
+                `(let ((,buffer-var (cffi:make-shareable-byte-vector ,size-var)))
+                   (declare (dynamic-extent ,buffer-var)) ,form))))
+    `(let ((,size-var ,size))
+       ,(wrap-with-buffer-var
+         `(cffi:with-pointer-to-vector-data (,pointer ,buffer-var)
+            (let ((,allocator (make-sized-monotonic-buffer-allocator :pointer ,pointer :size ,size-var :upstream ,upstream)))
+              (declare (dynamic-extent ,allocator))
+              (multiple-value-call ,values
+                (let ((*foreign-allocator* ,allocator))
+                  ,@body)))))))))
 
 (defmacro with-default-allocator (&body body)
   `(let ((*foreign-allocator* *default-foreign-allocator*))
