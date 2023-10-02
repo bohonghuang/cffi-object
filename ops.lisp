@@ -9,7 +9,12 @@
 
 (defconstant +ctypes-slots+ (fdefinition 'cffi-ops::ctypes-slots))
 
-(setf (fdefinition 'cobj::funcall-dynamic-extent-form) (fdefinition 'cffi-ops::funcall-dynamic-extent-form))
+(defconstant +pointer-type-p+ (fdefinition 'cffi-ops::pointer-type-p))
+
+(defconstant +ensure-pointer-type+ (fdefinition 'cffi-ops::ensure-pointer-type))
+
+(setf (fdefinition 'cobj::funcall-dynamic-extent-form) (fdefinition 'cffi-ops::funcall-dynamic-extent-form)
+      (fdefinition 'cobj::funcall-form-type) (fdefinition 'cffi-ops::funcall-form-type))
 
 (defun ctypes-slots-with-cobject (types)
   (funcall +ctypes-slots+ (mapcar (lambda (type)
@@ -28,17 +33,27 @@
        (values (cons :pointer (cdr type)) `(cobj:cobject-pointer ,form)))
       (t (values type form)))))
 
+(defun pointer-or-object-type-p (type)
+  (if (and (consp type) (eq (car type) :object)) t (funcall +pointer-type-p+ type)))
+
+(defun ensure-pointer-or-object-type (type)
+  (if (and (consp type) (eq (car type) :object)) type (funcall +ensure-pointer-type+ type)))
+
 (defmacro & (form)
   `(cobj:cobject-pointer ,form))
 
 (defun enable-cobject-ops ()
   (setf (fdefinition 'cffi-ops::form-type) #'form-type-with-object-unwrapped
         (fdefinition 'cffi-ops::ctypes-slots) #'ctypes-slots-with-cobject
+        (fdefinition 'cffi-ops::pointer-type-p) #'pointer-or-object-type-p
+        (fdefinition 'cffi-ops::ensure-pointer-type) #'ensure-pointer-or-object-type
         (fdefinition 'cffi-ops:&) #'cobj:cobject-pointer
         (compiler-macro-function 'cffi-ops:&) (macro-function '&)))
 
 (defun disable-cobject-ops ()
   (setf (fdefinition 'cffi-ops::form-type) +form-type+
         (fdefinition 'cffi-ops::ctypes-slots) +ctypes-slots+
+        (fdefinition 'cffi-ops::pointer-type-p) +pointer-type-p+
+        (fdefinition 'cffi-ops::ensure-pointer-type) +ensure-pointer-type+
         (compiler-macro-function 'cffi-ops:&) nil)
   (fmakunbound 'cffi-ops:&))
