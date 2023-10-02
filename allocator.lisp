@@ -31,14 +31,16 @@
                                                                              (if (<= (+ offset size) buffer-size)
                                                                                  (prog1 (cffi:inc-pointer pointer offset)
                                                                                    (incf offset size))
-                                                                                 (prog1 (funcall (foreign-allocator-allocator upstream) size)
-                                                                                   (setf offset buffer-size)
-                                                                                   (setf deallocator (foreign-allocator-deallocator upstream))))))
+                                                                                 (if upstream
+                                                                                     (prog1 (funcall (foreign-allocator-allocator upstream) size)
+                                                                                       (setf offset buffer-size)
+                                                                                       (setf deallocator (foreign-allocator-deallocator upstream)))
+                                                                                     (error "Cannot allocate a space of ~D byte~:P with allocator ~A." size allocator-1)))))
                                                               :deallocator #'values :size size :pointer pointer)))
     (setf allocator-1 allocator-2)
     allocator-2))
 
-(defmacro with-monotonic-buffer-allocator ((&key (size 128) (upstream '*foreign-allocator*)) &body body)
+(defmacro with-monotonic-buffer-allocator ((&key (size 128) (upstream '*foreign-allocator*) (values '#'values)) &body body)
   (with-gensyms (buffer pointer size-var allocator)
     `(let* ((,size-var ,size)
             (,buffer (cffi:make-shareable-byte-vector ,size-var)))
@@ -46,8 +48,9 @@
        (cffi:with-pointer-to-vector-data (,pointer ,buffer)
          (let ((,allocator (make-sized-monotonic-buffer-allocator :pointer ,pointer :size ,size-var :upstream ,upstream)))
            (declare (dynamic-extent ,allocator))
-           (let ((*foreign-allocator* ,allocator))
-             ,@body))))))
+           (multiple-value-call ,values
+             (let ((*foreign-allocator* ,allocator))
+               ,@body)))))))
 
 (defmacro with-default-allocator (&body body)
   `(let ((*foreign-allocator* *default-foreign-allocator*))
