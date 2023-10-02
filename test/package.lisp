@@ -278,8 +278,8 @@
     (is string= "" (carray-string arr))))
 
 (define-test monotonic-buffer-allocator :parent suite
-  (with-monotonic-buffer-allocator (:buffer-size 8)
-    (with-monotonic-buffer-allocator (:buffer-size 8)
+  (with-monotonic-buffer-allocator (:size 8)
+    (with-monotonic-buffer-allocator (:size 8)
       (of-type cobj::sized-monotonic-buffer-allocator cobj::*foreign-allocator*)
       (make-vector2)
       (is = 8 (cobj::sized-monotonic-buffer-allocator-offset cobj::*foreign-allocator*))
