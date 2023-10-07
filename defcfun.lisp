@@ -9,7 +9,10 @@
 
 (defparameter *return-argument-names* '(#:%%claw-result-))
 
+(defparameter *return-pointer-as-object-p* nil)
+
 (defparameter *optimize-object-allocation-p* t)
+
 (defparameter *optimize-out-temporary-object-p* t)
 
 (defun symbol-name= (sym1 sym2)
@@ -113,9 +116,14 @@
                         (with-gensyms (result)
                           `(lambda (,result)
                              ,(cond
-                                (return-object-from-result-p (let ((internal-constructor (nth-value 2 (cobject-type-constructor return-object-from-result-p))))
-                                                               `(locally (declare (notinline ,internal-constructor)) (,internal-constructor :pointer ,result))))
-                                (return-pointer-from-result-p `(pointer-cpointer ,result ',(cobject-class-definition-class (find-cobject-class-definition (cffi::pointer-type return-pointer-from-result-p)))))
+                                ((and return-object-from-result-p *return-pointer-as-object-p*)
+                                 (let ((internal-constructor (nth-value 2 (cobject-type-constructor return-object-from-result-p))))
+                                   `(locally (declare (notinline ,internal-constructor)) (,internal-constructor :pointer ,result))))
+                                (return-pointer-from-result-p `(pointer-cpointer ,result ',(or (ignore-some-conditions (cobject-class-definition-not-found-error)
+                                                                                                 (cobject-class-definition-class
+                                                                                                  (find-cobject-class-definition
+                                                                                                   (cffi::pointer-type return-pointer-from-result-p))))
+                                                                                               (cffi::name (cffi::pointer-type return-pointer-from-result-p)))))
                                 (t result))))))
                   `(progn
                      (defun ,symbol ,(mapcar #'car args)

@@ -72,6 +72,11 @@
               ((cpointer element-type) as-pointer)))
           (error "Undefined CFFI object class ~A." type)))))
 
+(define-condition cobject-class-definition-not-found-error (error)
+  ((type :initform nil :initarg :type :type cffi::foreign-type))
+  (:report (lambda (condition stream)
+             (format stream "Cannot find the CFFI object class for type ~A." (cffi::name (slot-value condition 'type))))))
+
 (defun find-cobject-class-definition (type)
   "Get the class definition of a cobject at compile-time."
   (check-type type cffi::foreign-type)
@@ -95,4 +100,4 @@
                           (cffi::foreign-pointer-type
                            `(cpointer ,(cobject-class-definition-class
                                         (find-cobject-class-definition (cffi::pointer-type type))))))))))
-      (error "Cannot find the CFFI object class for type ~A." (cffi::name type))))
+      (error 'cobject-class-definition-not-found-error :type type)))
