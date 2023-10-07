@@ -234,12 +234,39 @@
     (setf (caref strarr 0) "000")
     (is string= "000" (caref strarr 0))))
 
-(define-test array-of-pointer :parent suite
+(define-test array-of-array-of-pointer :parent suite
   (let ((arr (make-carray 3 :element-type '(carray (cpointer (signed-byte 8)) 1)
                             :initial-element (make-carray 1 :element-type '(cpointer (signed-byte 8))
                                                             :initial-element (pointer-cpointer (cffi-sys::make-pointer 123) '(signed-byte 8))))))
     (loop :for i :below 3
           :do (is cpointer-eq (caref (caref arr i) 0) (pointer-cpointer (make-pointer 123) '(signed-byte 8))))))
+
+(define-test pointer-of-pointer :parent suite
+  (let* ((arr1 (make-carray 1 :element-type '(signed-byte 8)
+                              :initial-element 1))
+         (arr2 (make-carray 1 :element-type '(signed-byte 8)
+                              :initial-element 2))
+         (arr3 (make-carray 1 :element-type '(signed-byte 8)
+                              :initial-element 3))
+         (arr4 (make-carray 3 :element-type '(cpointer (signed-byte 8))
+                              :initial-contents (list arr1 arr2 arr3))))
+    (loop :for ptr :in (carray-list arr4)
+          :for arr :in (list arr1 arr2 arr3)
+          :do (is cobject-eq arr ptr)
+              (is = (caref arr 0) (cref ptr)))))
+
+(define-test array-of-array :parent suite
+  (let* ((arr1 (make-carray 1 :element-type '(signed-byte 8)
+                              :initial-element 1))
+         (arr2 (make-carray 1 :element-type '(signed-byte 8)
+                              :initial-element 2))
+         (arr3 (make-carray 1 :element-type '(signed-byte 8)
+                              :initial-element 3))
+         (arr4 (make-carray 3 :element-type '(carray (signed-byte 8) 1)
+                              :initial-contents (list arr1 arr2 arr3))))
+    (loop :for ptr :in (carray-list arr4)
+          :for arr :in (list arr1 arr2 arr3)
+          :do (is = (caref arr 0) (caref ptr 0)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (cobj.ops:enable-cobject-ops))

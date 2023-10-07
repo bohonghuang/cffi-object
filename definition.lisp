@@ -53,14 +53,15 @@
                                                                                      :shared-from shared-from
                                                                                      :element-type element-type
                                                                                      :dimensions dimensions)))
-                                              `(:array ,(nth-value 1 (cobject-class-definition element-type)) . ,dimensions)))
+                                              (make-instance 'cffi::foreign-array-type :element-type (nth-value 1 (cobject-class-definition element-type))
+                                                                                       :dimensions dimensions)))
                             (as-pointer (values (make-cobject-class-definition
                                                  :class type
                                                  :internal-constructor (lambda (&key pointer shared-from)
                                                                          (declare (ignore shared-from))
                                                                          (%make-cpointer :pointer (cffi:mem-ref pointer :pointer)
                                                                                          :element-type element-type)))
-                                                `(:pointer ,(nth-value 1 (cobject-class-definition element-type))))))
+                                                (make-instance 'cffi::foreign-pointer-type :pointer-type (nth-value 1 (cobject-class-definition element-type))))))
             (destructuring-ecase type
               ((carray element-type &optional dimensions)
                (if dimensions
