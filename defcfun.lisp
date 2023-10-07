@@ -23,28 +23,32 @@
 
 (setf (macro-function 'defcfun) +defcfun+)
 
+(defun cobject-type-constructor (object-type)
+  (if-let ((definition (when object-type (assoc-value *cobject-class-definitions* object-type))))
+    (values (cobject-class-definition-constructor definition)
+            (cobject-class-definition-internal-constructor definition)
+            (cobject-class-definition-copier definition))
+    (if-let ((type-name (when object-type (cffi::name object-type))))
+      (values (intern (format nil "~A~A" '#:make- type-name) (symbol-package type-name))
+              (intern (format nil "~A~A" '#:copy- type-name) (symbol-package type-name))
+              (intern (format nil "~A~A" '#:%%%make- type-name) (symbol-package type-name)))
+      (error "Defining a C function that returns non-structure pointer is currently not supported."))))
+
 (defmacro defcobjfun (name result &rest args)
   (destructuring-bind (name symbol) name
     (let* ((should-define-wrapper-p (not (member '&rest args)))
            (internal-symbol (if should-define-wrapper-p (intern (format nil "%~A" symbol) (symbol-package symbol)) symbol))
-           (return-object-p (member (caar args) *return-argument-names* :test #'symbol-name=)))
+           (return-pointer-from-result-p (cffi-pointer-type-p result))
+           (return-object-from-result-p (cffi-object-type-p result))
+           (return-object-from-argument-p (member (caar args) *return-argument-names* :test #'symbol-name=)))
       `(progn
          (declaim (inline ,internal-symbol))
          (defcfun (,name ,internal-symbol) ,result . ,args)
          (export ',internal-symbol ',(symbol-package internal-symbol))
          ,(when should-define-wrapper-p
-            (if return-object-p
+            (if return-object-from-argument-p
                 (let ((object-type (cffi-object-type-p (cadar args))))
-                  (multiple-value-bind (object-constructor object-internal-constructor object-copier)
-                      (if-let ((definition (when object-type (assoc-value *cobject-class-definitions* object-type))))
-                        (values (cobject-class-definition-constructor definition)
-                                (cobject-class-definition-internal-constructor definition)
-                                (cobject-class-definition-copier definition))
-                        (if-let ((type-name (when object-type (cffi::name object-type))))
-                          (values (intern (format nil "~A~A" '#:make- type-name) (symbol-package type-name))
-                                  (intern (format nil "~A~A" '#:%%%make- type-name) (symbol-package type-name))
-                                  (intern (format nil "~A~A" '#:copy- type-name) (symbol-package type-name)))
-                          (error "Defining a C function that returns non-structure pointer is currently not supported.")))
+                  (multiple-value-bind (object-constructor object-copier object-internal-constructor) (cobject-type-constructor object-type)
                     `(progn
                        (declaim (ftype function ,object-constructor)
                                 (notinline ,object-constructor))
@@ -105,42 +109,51 @@
                               `(define-compiler-macro ,symbol ,(mapcar #'car args)
                                  (with-gensyms (,var)
                                    (funcall (funcall-dynamic-extent-form ',symbol (list . ,(mapcar #'car args))) ,var `((,',object-copier ,,var)))))))))))
-                `(progn
-                   (defun ,symbol ,(mapcar #'car args)
-                     (,internal-symbol . ,(loop :for (name type) :in args :collect (if (cffi-pointer-type-p type) `(cobj:cobject-pointer ,name) name))))
-                   ,(when (and *optimize-object-allocation-p* (loop :for (nil type) :in args :thereis (cffi-pointer-type-p type)))
-                      `(define-compiler-macro ,symbol ,(mapcar #'car args)
-                         #+sbcl (declare (sb-ext:muffle-conditions warning))
-                         ,(with-gensyms (dynamic-extent-forms dynamic-extent-form body temp-vars name form result)
-                            `(let ((,temp-vars (list . ,(loop :for (name nil) :in args :collect `(cons ',name (gensym ,(symbol-name name))))))
-                                   (,dynamic-extent-forms nil))
-                               ,@(loop :for (name type) :in args
-                                       :if (cffi-pointer-type-p type)
-                                         :collect `(if-let ((,dynamic-extent-form (when (consp ,name) (funcall-dynamic-extent-form (car ,name) (cdr ,name)))))
-                                                     (push (cons ',name (compose (curry ,dynamic-extent-form (assoc-value ,temp-vars ',name)) #'list)) ,dynamic-extent-forms)
-                                                     (push (cons nil (compose (lambda (,body) `(let ((,(assoc-value ,temp-vars ',name) ,,name)) . ,,body)) #'list)) ,dynamic-extent-forms))
-                                       :else
-                                         :collect `(push (cons nil (compose (lambda (,body) `(let ((,(assoc-value ,temp-vars ',name) ,,name)) . ,,body)) #'list)) ,dynamic-extent-forms))
-                               (nreversef ,dynamic-extent-forms)
-                               (reduce #'funcall ,(if *optimize-out-temporary-object-p*
-                                                      `(loop :for (,name . ,form) :in ,dynamic-extent-forms
-                                                             :if ,name
-                                                               :collect (let ((,form ,form))
-                                                                          (compose
-                                                                           (lambda (,body)
-                                                                             (let ((,result (funcall ,form ,body)))
-                                                                               `(,@(subseq ,result 0 3) ,@,body)))
-                                                                           #'list))
-                                                             :else
-                                                               :collect ,form)
-                                                      `(mapcar #'cdr ,dynamic-extent-forms))
-                                       :initial-value (list ',internal-symbol
-                                                            . ,(loop :for (name type) :in args
-                                                                     :collect (if (cffi-pointer-type-p type)
-                                                                                  (if *optimize-out-temporary-object-p*
-                                                                                      `(if (assoc-value ,dynamic-extent-forms ',name)
-                                                                                           (assoc-value ,temp-vars ',name)
-                                                                                           `(cobj:cobject-pointer ,(assoc-value ,temp-vars ',name)))
-                                                                                      ``(cobj:cobject-pointer ,(assoc-value ,temp-vars ',name)))
-                                                                                  `(assoc-value ,temp-vars ',name))))
-                                       :from-end t))))))))))))
+                (let ((result-wrapper
+                        (with-gensyms (result)
+                          `(lambda (,result)
+                             ,(cond
+                                (return-object-from-result-p (let ((internal-constructor (nth-value 2 (cobject-type-constructor return-object-from-result-p))))
+                                                               `(locally (declare (notinline ,internal-constructor)) (,internal-constructor :pointer ,result))))
+                                (return-pointer-from-result-p `(pointer-cpointer ,result ',(cobject-class-definition-class (find-cobject-class-definition (cffi::pointer-type return-pointer-from-result-p)))))
+                                (t result))))))
+                  `(progn
+                     (defun ,symbol ,(mapcar #'car args)
+                       (,result-wrapper (,internal-symbol . ,(loop :for (name type) :in args :collect (if (cffi-pointer-type-p type) `(cobj:cobject-pointer ,name) name)))))
+                     ,(when (and *optimize-object-allocation-p* (loop :for (nil type) :in args :thereis (cffi-pointer-type-p type)))
+                        `(define-compiler-macro ,symbol ,(mapcar #'car args)
+                           #+sbcl (declare (sb-ext:muffle-conditions warning))
+                           ,(with-gensyms (dynamic-extent-forms dynamic-extent-form body temp-vars name form result)
+                              `(let ((,temp-vars (list . ,(loop :for (name nil) :in args :collect `(cons ',name (gensym ,(symbol-name name))))))
+                                     (,dynamic-extent-forms nil))
+                                 ,@(loop :for (name type) :in args
+                                         :if (cffi-pointer-type-p type)
+                                           :collect `(if-let ((,dynamic-extent-form (when (consp ,name) (funcall-dynamic-extent-form (car ,name) (cdr ,name)))))
+                                                       (push (cons ',name (compose (curry ,dynamic-extent-form (assoc-value ,temp-vars ',name)) #'list)) ,dynamic-extent-forms)
+                                                       (push (cons nil (compose (lambda (,body) `(let ((,(assoc-value ,temp-vars ',name) ,,name)) . ,,body)) #'list)) ,dynamic-extent-forms))
+                                         :else
+                                           :collect `(push (cons nil (compose (lambda (,body) `(let ((,(assoc-value ,temp-vars ',name) ,,name)) . ,,body)) #'list)) ,dynamic-extent-forms))
+                                 (nreversef ,dynamic-extent-forms)
+                                 (reduce #'funcall ,(if *optimize-out-temporary-object-p*
+                                                        `(loop :for (,name . ,form) :in ,dynamic-extent-forms
+                                                               :if ,name
+                                                                 :collect (let ((,form ,form))
+                                                                            (compose
+                                                                             (lambda (,body)
+                                                                               (let ((,result (funcall ,form ,body)))
+                                                                                 `(,@(subseq ,result 0 3) ,@,body)))
+                                                                             #'list))
+                                                               :else
+                                                                 :collect ,form)
+                                                        `(mapcar #'cdr ,dynamic-extent-forms))
+                                         :initial-value (list ',result-wrapper
+                                                              (list ',internal-symbol
+                                                                    . ,(loop :for (name type) :in args
+                                                                             :collect (if (cffi-pointer-type-p type)
+                                                                                          (if *optimize-out-temporary-object-p*
+                                                                                              `(if (assoc-value ,dynamic-extent-forms ',name)
+                                                                                                   (assoc-value ,temp-vars ',name)
+                                                                                                   `(cobj:cobject-pointer ,(assoc-value ,temp-vars ',name)))
+                                                                                              ``(cobj:cobject-pointer ,(assoc-value ,temp-vars ',name)))
+                                                                                          `(assoc-value ,temp-vars ',name)))))
+                                         :from-end t)))))))))))))
