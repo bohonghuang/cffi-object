@@ -4,6 +4,12 @@
                    (:constructor %make-carray))
   (dimensions '(0) :type (cons fixnum null)))
 
+(defun cpointer-carray (cpointer dimensions)
+  (%make-carray :pointer (cpointer-pointer cpointer)
+                :shared-from (cpointer-shared-from cpointer)
+                :element-type (cpointer-element-type cpointer)
+                :dimensions (ensure-cons dimensions)))
+
 (defun caref (array &rest subscripts &aux (subscript (first subscripts)))
   (unless (<= 0 subscript (1- (first (carray-dimensions array))))
     (error "Index ~D is out of bound." subscript))
@@ -62,9 +68,8 @@
                       initial-element initial-contents
                       displaced-to
                       (displaced-index-offset 0))
-  (unless (listp dimensions)
-    (setf dimensions (list dimensions)))
-  (let* ((primitive-type-p (primitive-type-p element-type))
+  (let* ((dimensions (ensure-cons dimensions))
+         (primitive-type-p (primitive-type-p element-type))
          (pointer-type-p (and (listp element-type) (eq (first element-type) 'cpointer)))
          (character-type-p (eq element-type 'character))
          (element-size (cobject-class-object-size element-type))
