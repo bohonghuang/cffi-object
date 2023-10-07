@@ -12,6 +12,7 @@
            #:carray
            #:make-carray
            #:pointer-carray
+           #:cpointer-carray
            #:carray-dimensions
            #:carray-displacement
            #:carray-element-type
