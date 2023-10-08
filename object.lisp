@@ -20,7 +20,7 @@
 
 (defun manage-cobject (cobject)
   (let ((pointer (cobject-pointer cobject))
-        (deallocator (foreign-allocator-deallocator *foreign-allocator*)))
+        (deallocator (cobject-allocator-deallocator *cobject-allocator*)))
     (tg:finalize cobject (lambda () (funcall deallocator pointer)))))
 
 (defun unmanage-cobject (cobject)
