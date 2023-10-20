@@ -41,25 +41,30 @@
     allocator-2))
 
 (defmacro with-monotonic-buffer-allocator ((&key
-                                              buffer
+                                              buffer pointer
                                               (size (if buffer `(length ,buffer) 128))
                                               (upstream '*cobject-allocator*)
                                               (values '#'values))
                                            &body body)
-  (with-gensyms (buffer-var pointer size-var allocator)
+  (with-gensyms (buffer-var pointer-var size-var allocator)
     (flet ((wrap-with-buffer-var (form)
-             (if buffer
-                 `(let ((,buffer-var ,buffer)) ,form)
-                 `(let ((,buffer-var (cffi:make-shareable-byte-vector ,size-var)))
-                    (declare (dynamic-extent ,buffer-var)) ,form))))
+             (cond
+               (buffer `(let ((,buffer-var ,buffer)) ,form))
+               (pointer form)
+               (t `(let ((,buffer-var (cffi:make-shareable-byte-vector ,size-var)))
+                     (declare (dynamic-extent ,buffer-var)) ,form))))
+           (wrap-with-pointer-var (form)
+             (if pointer
+                 `(let ((,pointer-var ,pointer)) ,form)
+                 `(cffi:with-pointer-to-vector-data (,pointer-var ,buffer-var) ,form))))
       `(let ((,size-var ,size))
          ,(wrap-with-buffer-var
-           `(cffi:with-pointer-to-vector-data (,pointer ,buffer-var)
-              (let ((,allocator (make-sized-monotonic-buffer-allocator :pointer ,pointer :size ,size-var :upstream ,upstream)))
-                (declare (dynamic-extent ,allocator))
-                (multiple-value-call ,values
-                  (let ((*cobject-allocator* ,allocator))
-                    ,@body)))))))))
+           (wrap-with-pointer-var
+            `(let ((,allocator (make-sized-monotonic-buffer-allocator :pointer ,pointer-var :size ,size-var :upstream ,upstream)))
+               (declare (dynamic-extent ,allocator))
+               (multiple-value-call ,values
+                 (let ((*cobject-allocator* ,allocator))
+                   ,@body)))))))))
 
 (defmacro with-default-allocator (&body body)
   `(let ((*cobject-allocator* *default-cobject-allocator*))
