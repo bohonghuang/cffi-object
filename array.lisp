@@ -72,10 +72,13 @@
          (primitive-type-p (primitive-type-p element-type))
          (pointer-type-p (and (listp element-type) (eq (first element-type) 'cpointer)))
          (character-type-p (eq element-type 'character))
-         (element-size (cobject-class-object-size element-type))
+         (element-foreign-type (nth-value 1 (cobject-class-definition element-type)))
+         (element-size (cffi:foreign-type-size element-foreign-type))
          (total-size (* element-size (reduce #'* dimensions)))
          (pointer (if displaced-to (cffi:inc-pointer (cobject-pointer displaced-to) (* element-size displaced-index-offset))
-                      (funcall (cobject-allocator-allocator *cobject-allocator*) total-size)))
+                      (funcall (cobject-allocator-allocator *cobject-allocator*) (make-instance 'cffi::foreign-array-type
+                                                                                                :element-type element-foreign-type
+                                                                                                :dimensions dimensions))))
          (array (if displaced-to
                     (progn
                       (assert (<= 0 displaced-index-offset (+ displaced-index-offset (first dimensions)) (first (carray-dimensions displaced-to))))
@@ -88,6 +91,8 @@
                     (manage-cobject (%make-carray :pointer pointer
                                                   :dimensions dimensions
                                                   :element-type element-type)))))
+    (declare (type non-negative-fixnum element-size total-size)
+             (type (cons non-negative-fixnum t) dimensions))
     (when initial-element
       (assert (null initial-contents))
       (assert (null displaced-to))
@@ -114,6 +119,7 @@
          (unless character-type-p
            (assert (= (first dimensions) (length initial-contents))))
          (let ((i 0))
+           (declare (type non-negative-fixnum i))
            (map nil (cond
                       (character-type-p
                        (cffi:lisp-string-to-foreign (coerce initial-contents 'string) pointer total-size)

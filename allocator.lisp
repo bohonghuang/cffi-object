@@ -1,11 +1,13 @@
 (in-package #:cffi-object)
 
 (defstruct cobject-allocator
-  (allocator (constantly (cffi:null-pointer)) :type (function (non-negative-fixnum) (values cffi:foreign-pointer)))
+  (allocator (constantly (cffi:null-pointer)) :type (function (cffi::foreign-type) (values cffi:foreign-pointer)))
   (deallocator #'values :type (function (cffi:foreign-pointer))))
 
 (declaim (type cobject-allocator *default-cobject-allocator*))
-(defparameter *default-cobject-allocator* (make-cobject-allocator :allocator #'cffi-sys:%foreign-alloc :deallocator #'cffi-sys:foreign-free))
+(defparameter *default-cobject-allocator* (make-cobject-allocator
+                                           :allocator (lambda (type) (cffi-sys:%foreign-alloc (cffi:foreign-type-size type)))
+                                           :deallocator #'cffi-sys:foreign-free))
 
 (declaim (type cobject-allocator *cobject-allocator*))
 (defparameter *cobject-allocator* *default-cobject-allocator*)
@@ -20,22 +22,23 @@
 (defun make-sized-monotonic-buffer-allocator (&key (pointer (cffi:null-pointer)) (size 0) (upstream *cobject-allocator*))
   #+sbcl (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (let* ((allocator-1 nil)
-         (allocator-2 (%make-sized-monotonic-buffer-allocator :allocator (lambda (size)
-                                                                           (declare (type non-negative-fixnum size))
+         (allocator-2 (%make-sized-monotonic-buffer-allocator :allocator (lambda (type &aux (size (cffi:foreign-type-size type)) (align (cffi:foreign-type-alignment type)))
+                                                                           (declare (type non-negative-fixnum size align))
                                                                            (with-accessors ((offset sized-monotonic-buffer-allocator-offset)
                                                                                             (buffer-size sized-monotonic-buffer-allocator-size)
                                                                                             (pointer sized-monotonic-buffer-allocator-pointer)
                                                                                             (allocator sized-monotonic-buffer-allocator-allocator)
                                                                                             (deallocator sized-monotonic-buffer-allocator-deallocator))
                                                                                allocator-1
-                                                                             (if (<= (+ offset size) buffer-size)
-                                                                                 (prog1 (cffi:inc-pointer pointer offset)
-                                                                                   (incf offset size))
-                                                                                 (if upstream
-                                                                                     (prog1 (funcall (cobject-allocator-allocator upstream) size)
-                                                                                       (setf offset buffer-size)
-                                                                                       (setf deallocator (cobject-allocator-deallocator upstream)))
-                                                                                     (error "Cannot allocate a space of ~D byte~:P with allocator ~A." size allocator-1)))))
+                                                                             (let ((align-offset (mod (- align offset) align)))
+                                                                               (if (<= (+ offset align-offset size) buffer-size)
+                                                                                   (prog1 (cffi:inc-pointer pointer (incf offset align-offset))
+                                                                                     (incf offset size))
+                                                                                   (if upstream
+                                                                                       (prog1 (funcall (cobject-allocator-allocator upstream) type)
+                                                                                         (setf offset buffer-size)
+                                                                                         (setf deallocator (cobject-allocator-deallocator upstream)))
+                                                                                       (error "Cannot allocate a space of ~D byte~:P with allocator ~A." size allocator-1))))))
                                                               :deallocator #'values :size size :pointer pointer)))
     (setf allocator-1 allocator-2)
     allocator-2))

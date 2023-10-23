@@ -119,7 +119,7 @@
                    ,pointer))
                (declaim (inline ,constructor))
                (defun ,constructor (&key . ,(mapcar #'list slots (mapcar (constantly nil) slots) slot-supplied-p-list))
-                 (let* ((,pointer (funcall (cobject-allocator-allocator *cobject-allocator*) (cffi:foreign-type-size ',type)))
+                 (let* ((,pointer (funcall (cobject-allocator-allocator *cobject-allocator*) ',type))
                         (,instance (,internal-constructor :pointer ,pointer)))
                    ,@(loop :for slot :in slots
                            :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot))
@@ -134,7 +134,7 @@
                                     (cobject-pointer ,instance2)
                                     (cffi:foreign-type-size ',type)))))
                (declaim (inline ,copier))
-               (defun ,copier (,instance &optional (,destination (manage-cobject (,internal-constructor :pointer (funcall (cobject-allocator-allocator *cobject-allocator*) (cffi:foreign-type-size ',type))))))
+               (defun ,copier (,instance &optional (,destination (manage-cobject (,internal-constructor :pointer (funcall (cobject-allocator-allocator *cobject-allocator*) ',type)))))
                  (check-type ,instance ,name)
                  (check-type ,destination ,name)
                  (memcpy (cobject-pointer ,destination) (cobject-pointer ,instance) (cffi:foreign-type-size ',type))
