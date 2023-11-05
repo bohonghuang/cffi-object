@@ -67,9 +67,9 @@
                                `(:object ,(cffi::unparse-type ',object-type)))
                              (defmethod funcall-dynamic-extent-form ((,function (eql ',symbol)) ,function-args)
                                (declare (ignore ,function))
-                               #+sbcl (declare (sb-ext:muffle-conditions warning))
                                (destructuring-bind ,(mapcar #'car (cdr args)) ,function-args
                                  (let ((,temp-vars (list . ,(loop :for (name nil) :in args :collect `(cons ',name (gensym ,(symbol-name name)))))))
+                                   (declare (ignorable ,temp-vars))
                                    (let ((,dynamic-extent-forms nil))
                                      ,@(loop :for (name type) :in (cdr args)
                                              :if (cffi-pointer-type-p type)
@@ -130,7 +130,6 @@
                        (,result-wrapper (,internal-symbol . ,(loop :for (name type) :in args :collect (if (cffi-pointer-type-p type) `(cobj:cobject-pointer ,name) name)))))
                      ,(when (and *optimize-object-allocation-p* (loop :for (nil type) :in args :thereis (cffi-pointer-type-p type)))
                         `(define-compiler-macro ,symbol ,(mapcar #'car args)
-                           #+sbcl (declare (sb-ext:muffle-conditions warning))
                            ,(with-gensyms (dynamic-extent-forms dynamic-extent-form body temp-vars name form result)
                               `(let ((,temp-vars (list . ,(loop :for (name nil) :in args :collect `(cons ',name (gensym ,(symbol-name name))))))
                                      (,dynamic-extent-forms nil))
