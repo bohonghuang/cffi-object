@@ -26,22 +26,31 @@
   (first (carray-dimensions carray)))
 
 (defmethod print-object ((array carray) stream)
-  (print-unreadable-object (array stream)
-    (loop :named print-element-loop
-          :with length := (first (carray-dimensions array))
-          :initially
-             (case (carray-element-type array)
-               (character (ignore-errors
-                           (return-from print-element-loop
-                             (print-object (carray-string array) stream)))))
-          :for i :below length
-          :if (< i 10)
-            :unless (zerop i)
-              :do (format stream "~%  ")
-          :end
-          :and :do (prin1 (caref array i) stream)
-          :else
-            :return (format stream " ... [~D elements elided]" (- length 10)))))
+  (if *print-readably*
+      (progn
+        (format stream "#.")
+        (prin1
+         `(make-carray
+           ',(carray-dimensions array)
+           :element-type ',(carray-element-type array)
+           :initial-contents ',(carray-array array))
+         stream))
+      (print-unreadable-object (array stream)
+        (loop :named print-element-loop
+              :with length := (first (carray-dimensions array))
+              :initially
+                 (case (carray-element-type array)
+                   (character (ignore-errors
+                               (return-from print-element-loop
+                                 (print-object (carray-string array) stream)))))
+              :for i :below length
+              :if (< i 10)
+                :unless (zerop i)
+                  :do (format stream "~%  ")
+              :end
+              :and :do (prin1 (caref array i) stream)
+              :else
+                :return (format stream " ... [~D elements elided]" (- length 10))))))
 
 (defstruct (displaced-carray (:include carray)
                              (:constructor %make-displaced-carray))
