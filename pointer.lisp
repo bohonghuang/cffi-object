@@ -5,10 +5,18 @@
   (element-type nil :type (or symbol cons)))
 
 (defmethod print-object ((pointer cpointer) stream)
-  (print-unreadable-object (pointer stream)
-    (format stream #.(concatenate 'string "~A @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
-            (cpointer-element-type pointer)
-            (cffi:pointer-address (cobject-pointer pointer)))))
+  (if *print-readably*
+      (progn
+        (format stream "#.")
+        (prin1 `(pointer-cpointer
+                 (cffi:make-pointer
+                  ',(cffi:pointer-address (cpointer-pointer pointer)))
+                 ',(cpointer-element-type pointer))
+               stream))
+      (print-unreadable-object (pointer stream)
+        (format stream #.(concatenate 'string "~A @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
+                (cpointer-element-type pointer)
+                (cffi:pointer-address (cobject-pointer pointer))))))
 
 (defun cref (cpointer &optional (subscript 0))
   (multiple-value-bind (definition type)

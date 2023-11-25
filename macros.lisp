@@ -139,13 +139,21 @@
                  (check-type ,destination ,name)
                  (memcpy (cobject-pointer ,destination) (cobject-pointer ,instance) (cffi:foreign-type-size ',type))
                  ,destination)
-               (defmethod print-object ((,instance ,name) ,stream)
-                 (print-unreadable-object (,instance ,stream)
-                   (princ ,(string name) ,stream)
-                   ,@(loop :for (slot . slot-accessor) :in slot-accessors
-                           :collect `(format ,stream ," :~A ~S" ,(symbol-name slot) (,slot-accessor ,instance)))
-                   (format ,stream ,(concatenate 'string " @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
-                           (cffi:pointer-address (cobject-pointer ,instance)))))
+               ,(with-gensyms (print-slots)
+                  `(defmethod print-object ((,instance ,name) ,stream)
+                     (flet ((,print-slots ()
+                              ,@(loop :for (slot . slot-accessor) :in slot-accessors
+                                      :collect `(format ,stream ," :~A ~S" ',slot (,slot-accessor ,instance)))))
+                       (if *print-readably*
+                           (progn
+                             (format ,stream "#.(~S" ',constructor)
+                             (,print-slots)
+                             (format ,stream ")"))
+                           (print-unreadable-object (,instance ,stream)
+                             (format ,stream "~S" ',name)
+                             (,print-slots)
+                             (format ,stream ,(concatenate 'string " @0x~" (prin1-to-string (* 2 (cffi:foreign-type-size :size))) ",'0X")
+                                     (cffi:pointer-address (cobject-pointer ,instance))))))))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition)))))))))
 

@@ -321,3 +321,21 @@
     (is = 8 (cobj::sized-monotonic-buffer-allocator-offset cobj::*cobject-allocator*))
     (isnt eq #'values (cobj::sized-monotonic-buffer-allocator-deallocator cobj::*cobject-allocator*)))
   (tg:gc :full t))
+
+(define-test readable-cobject :parent suite :fix (*print-readably*)
+  (setf *print-readably* t)
+  (define-test readable-cpointer
+    (let ((cpointer (pointer-cpointer (make-pointer 1234) '(unsigned-byte 32))))
+      (is cpointer-eq cpointer (read-from-string (prin1-to-string cpointer)))))
+  (define-test readable-carray
+    (let* ((carray (make-carray 10 :element-type '(unsigned-byte 32)))
+           (displaced-carray (make-carray 10 :element-type '(unsigned-byte 32)
+                                             :displaced-to carray)))
+      (is carray-equal carray (read-from-string (prin1-to-string carray)))
+      (is carray-equal displaced-carray (read-from-string (prin1-to-string displaced-carray)))))
+  (define-test readable-simple-cobject
+    (let ((vector2 (make-vector2)))
+      (is vector2-equal vector2 (read-from-string (prin1-to-string vector2)))))
+  (define-test readable-complex-cobject
+    (let ((camera-2d (make-camera-2d)))
+      (is camera-2d-equal camera-2d (read-from-string (prin1-to-string camera-2d))))))
