@@ -81,23 +81,22 @@
   "Get the class definition of a cobject at compile-time."
   (check-type type cffi::foreign-type)
   (or (assoc-value *cobject-class-definitions* type)
-      (and (typep type 'cffi::foreign-built-in-type)
-           (make-cobject-class-definition
-            :class (case type
-                     (#.(cffi::ensure-parsed-base-type :float) 'single-float)
-                     (#.(cffi::ensure-parsed-base-type :double) 'double-float)
-                     (#.(cffi::ensure-parsed-base-type :string) 'string)
-                     (#.(mapcar #'cffi::ensure-parsed-base-type '(:int8 :int16 :int32 :int64))
-                      `(signed-byte ,(* (cffi:foreign-type-size type) 8)))
-                     (#.(mapcar #'cffi::ensure-parsed-base-type '(:uint8 :uint16 :uint32 :uint64))
-                      `(unsigned-byte ,(* (cffi:foreign-type-size type) 8)))
-                     (#.(cffi::ensure-parsed-base-type :void) 'null)
-                     (t (etypecase type
-                          (cffi::foreign-array-type
-                           `(carray ,(cobject-class-definition-class
-                                      (find-cobject-class-definition (cffi::element-type type)))
-                                    ,(cffi::dimensions type)))
-                          (cffi::foreign-pointer-type
-                           `(cpointer ,(cobject-class-definition-class
-                                        (find-cobject-class-definition (cffi::pointer-type type))))))))))
-      (error 'cobject-class-definition-not-found-error :type type)))
+      (make-cobject-class-definition
+       :class (case type
+                (#.(cffi::ensure-parsed-base-type :float) 'single-float)
+                (#.(cffi::ensure-parsed-base-type :double) 'double-float)
+                (#.(mapcar #'cffi::ensure-parsed-base-type '(:int8 :int16 :int32 :int64))
+                 `(signed-byte ,(* (cffi:foreign-type-size type) 8)))
+                (#.(mapcar #'cffi::ensure-parsed-base-type '(:uint8 :uint16 :uint32 :uint64))
+                 `(unsigned-byte ,(* (cffi:foreign-type-size type) 8)))
+                (#.(cffi::ensure-parsed-base-type :void) 'null)
+                (t (typecase type
+                     (cffi::foreign-string-type 'string)
+                     (cffi::foreign-array-type
+                      `(carray ,(cobject-class-definition-class
+                                 (find-cobject-class-definition (cffi::element-type type)))
+                               ,(cffi::dimensions type)))
+                     (cffi::foreign-pointer-type
+                      `(cpointer ,(cobject-class-definition-class
+                                   (find-cobject-class-definition (cffi::pointer-type type)))))
+                     (t (error 'cobject-class-definition-not-found-error :type type))))))))
