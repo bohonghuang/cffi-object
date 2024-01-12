@@ -40,9 +40,15 @@
 
 (defmacro define-prototype-cobject-class (desc)
   (with-parsed-desc (name type) desc
-    (with-new-cobject-class-definition (name type)
-      `(eval-when (:compile-toplevel :load-toplevel :execute)
-         (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition)))))
+    `(progn
+       ,(with-new-cobject-class-definition (name type)
+          `(eval-when (:compile-toplevel :load-toplevel :execute)
+             (setf (assoc-value *cobject-class-definitions* ',type) ,cobject-class-definition)))
+       ,(let ((base-type (cffi::ensure-parsed-base-type type)))
+          (unless (or (eq type base-type) (assoc-value *cobject-class-definitions* base-type))
+            (with-new-cobject-class-definition (name base-type)
+              `(eval-when (:compile-toplevel :load-toplevel :execute)
+                 (setf (assoc-value *cobject-class-definitions* ',base-type) ,cobject-class-definition))))))))
 
 (defmacro define-struct-cobject-class (desc &rest options)
   (let ((options (reduce #'append options)))
