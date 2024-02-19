@@ -46,15 +46,20 @@
          (t nil))
        primitive-type)
       (if (listp type)
-          (symbol-macrolet ((as-array (values (make-cobject-class-definition
-                                               :class type
-                                               :internal-constructor (lambda (&key pointer shared-from)
-                                                                       (%make-carray :pointer pointer
-                                                                                     :shared-from shared-from
-                                                                                     :element-type element-type
-                                                                                     :dimensions dimensions)))
-                                              (make-instance 'cffi::foreign-array-type :element-type (nth-value 1 (cobject-class-definition element-type))
-                                                                                       :dimensions dimensions)))
+          (symbol-macrolet ((as-array (let ((ctype (make-instance
+                                                    'cffi::foreign-array-type
+                                                    :element-type (nth-value 1 (cobject-class-definition element-type))
+                                                    :dimensions dimensions))
+                                            (internal-constructor (lambda (&key pointer shared-from)
+                                                                    (%make-carray :pointer pointer
+                                                                                  :shared-from shared-from
+                                                                                  :element-type element-type
+                                                                                  :dimensions dimensions))))
+                                        (values (make-cobject-class-definition
+                                                 :class type
+                                                 :internal-constructor internal-constructor
+                                                 :constructor (lambda () (manage-cobject (funcall internal-constructor :pointer (cffi:foreign-alloc ctype)))))
+                                                ctype)))
                             (as-pointer (values (make-cobject-class-definition
                                                  :class type
                                                  :internal-constructor (lambda (&key pointer shared-from)

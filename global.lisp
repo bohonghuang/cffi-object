@@ -6,12 +6,12 @@
   (loop :with definitions := *cobject-class-definitions*
         :for (name . value) :in *global-cobjects*
         :for cobject := (symbol-value name)
-        :for class := (class-of (symbol-value name))
-        :for (ctype . definition) := (rassoc (class-name class) definitions :key #'cobject-class-definition-class)
+        :for type := (cobject-type (symbol-value name))
+        :for (definition ctype) := (multiple-value-list (cobject-class-definition type))
         :for constructor := (cobject-class-definition-constructor definition)
         :for size := (cffi:foreign-type-size ctype)
         :nconc (carray-list (pointer-carray (cobject-pointer cobject) '(unsigned-byte 8) size)) :into data
-        :collect (let ((constructor (fdefinition constructor)) (size size)
+        :collect (let ((constructor (ensure-function constructor)) (size size)
                        (offset offset) (symbol name))
                    (lambda (bytes)
                      (let ((cobject (funcall constructor)))
