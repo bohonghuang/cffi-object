@@ -4,6 +4,9 @@
                    (:constructor %make-carray))
   (dimensions '(0) :type (cons fixnum null)))
 
+(defmethod cobject-type ((array carray))
+  `(carray ,(carray-element-type array) ,(carray-dimensions array)))
+
 (defun cpointer-carray (cpointer dimensions)
   (%make-carray :pointer (cpointer-pointer cpointer)
                 :shared-from (cpointer-shared-from cpointer)

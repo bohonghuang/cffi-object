@@ -26,3 +26,7 @@
 (defun unmanage-cobject (cobject)
   (tg:cancel-finalization cobject)
   (cobject-pointer cobject))
+
+(defgeneric cobject-type (object)
+  (:method (object)
+    (type-of object)))

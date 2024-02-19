@@ -4,6 +4,9 @@
                      (:constructor %make-cpointer))
   (element-type nil :type (or symbol cons)))
 
+(defmethod cobject-type ((pointer cpointer))
+  `(cpointer ,(cpointer-element-type pointer)))
+
 (defmethod print-object ((pointer cpointer) stream)
   (if *print-readably*
       (progn
