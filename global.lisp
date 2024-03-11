@@ -10,7 +10,7 @@
         :for (definition ctype) := (multiple-value-list (cobject-class-definition type))
         :for constructor := (cobject-class-definition-constructor definition)
         :for size := (cffi:foreign-type-size ctype)
-        :nconc (carray-list (pointer-carray (cobject-pointer cobject) '(unsigned-byte 8) size)) :into data
+        :nconc (ccoerce (pointer-carray (cobject-pointer cobject) '(unsigned-byte 8) size) 'list) :into data
         :collect (let ((constructor (ensure-function constructor)) (size size)
                        (offset offset) (symbol name))
                    (lambda (bytes)
