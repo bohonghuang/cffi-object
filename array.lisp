@@ -28,6 +28,45 @@
 (defun clength (carray)
   (first (carray-dimensions carray)))
 
+(defgeneric ccoerce (cobject type))
+
+(defgeneric (setf ccoerce) (value cobject type))
+
+(defmethod ccoerce ((array carray) (type (eql 'list)))
+  (declare (ignore type))
+  (loop :for i :below (clength array)
+        :collect (caref array i)))
+
+(defmethod ccoerce ((cobject cobject) (type list))
+  (ccoerce cobject (car type)))
+
+(defmethod ccoerce ((array carray) (type (eql 'simple-vector)))
+  (declare (ignore type))
+  (make-array (clength array) :initial-contents (ccoerce array 'list)))
+
+(defmethod ccoerce ((array carray) (type (eql 'simple-array)))
+  (declare (ignore type))
+  (if (symbolp (carray-element-type array))
+      (make-array (clength array) :element-type (carray-element-type array)
+                                  :initial-contents (ccoerce array 'list))
+      (ccoerce array 'simple-vector)))
+
+(defmethod ccoerce ((array carray) (type (eql 'vector)))
+  (declare (ignore type))
+  (ccoerce array 'simple-array))
+
+(defmethod ccoerce ((array carray) (type (eql 'array)))
+  (declare (ignore type))
+  (ccoerce array 'simple-array))
+
+(defmethod ccoerce ((array carray) (type (eql 'string)))
+  (declare (ignore type))
+  (cffi:foreign-string-to-lisp (carray-pointer array)))
+
+(defmethod (setf ccoerce) ((value string) (array carray) (type (eql 'string)))
+  (declare (ignore type))
+  (cffi:lisp-string-to-foreign value (carray-pointer array) (clength array)))
+
 (defmethod print-object ((array carray) stream)
   (if *print-readably*
       (progn
@@ -36,7 +75,7 @@
          `(make-carray
            ',(carray-dimensions array)
            :element-type ',(carray-element-type array)
-           :initial-contents ',(carray-array array))
+           :initial-contents ',(ccoerce array 'array))
          stream))
       (print-unreadable-object (array stream)
         (loop :named print-element-loop
@@ -45,7 +84,7 @@
                  (case (carray-element-type array)
                    (character (ignore-errors
                                (return-from print-element-loop
-                                 (print-object (carray-string array) stream)))))
+                                 (print-object (ccoerce array 'string) stream)))))
               :for i :below length
               :if (< i 10)
                 :unless (zerop i)
@@ -68,12 +107,6 @@
      (values (displaced-carray-displaced-to array)
              (displaced-carray-displaced-index-offset array)))
     (t (values nil nil))))
-
-(defun carray-string (carray)
-  (cffi:foreign-string-to-lisp (carray-pointer carray)))
-
-(defun (setf carray-string) (value carray)
-  (cffi:lisp-string-to-foreign value (carray-pointer carray) (clength carray)))
 
 (defun make-carray (dimensions
                     &key element-type
@@ -176,15 +209,3 @@
   (unless (= (clength array1) (clength array2))
     (return-from carray-equal nil))
   (cpointer-equal array1 array2 (clength array1)))
-
-(declaim (ftype (function (carray) (values list)) carray-list))
-(defun carray-list (array)
-  (loop :for i :below (clength array)
-        :collect (caref array i)))
-
-(declaim (ftype (function (carray) (values simple-array)) carray-array))
-(defun carray-array (carray)
-  (if (symbolp (carray-element-type carray))
-      (make-array (clength carray) :element-type (carray-element-type carray)
-                                   :initial-contents (carray-list carray))
-      (make-array (clength carray) :initial-contents (carray-list carray))))
