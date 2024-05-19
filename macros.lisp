@@ -68,46 +68,71 @@
                              (:predicate ,predicate)
                              (:copier nil)
                              (:constructor ,internal-constructor)))
-                 ,@(loop :for (slot . slot-accessor) :in slot-accessors
-                         :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot))
-                         :for slot-pointer := `(cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot)
-                         :for slot-value := `(cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot)
+                 ,@(loop :with slots := (cffi::slots type)
+                         :for (slot-name . slot-accessor) :in slot-accessors
+                         :for slot := (gethash slot-name slots)
+                         :for slot-type := (cffi::ensure-parsed-base-type (cffi:foreign-slot-type type slot-name))
+                         :for slot-pointer := `(cffi:foreign-slot-pointer (cobject-pointer ,instance) ',type ',slot-name)
+                         :for slot-value := `(cffi:foreign-slot-value (cobject-pointer ,instance) ',type ',slot-name)
                          :nconc `((declaim (inline ,slot-accessor))
                                   (defun ,slot-accessor (,instance)
-                                    ,(typecase slot-type
-                                       (cffi::foreign-struct-type
-                                        `(,(cobject-class-definition-internal-constructor
-                                            (find-cobject-class-definition slot-type))
-                                          :pointer ,slot-pointer
-                                          :shared-from ,instance))
-                                       (cffi::foreign-array-type
-                                        `(%make-carray
-                                          :pointer ,slot-pointer
-                                          :shared-from ,instance
-                                          :dimensions ',(cffi::dimensions slot-type)
-                                          :element-type ',(cobject-class-definition-class
-                                                           (find-cobject-class-definition
-                                                            (cffi::ensure-parsed-base-type
-                                                             (cffi::element-type slot-type))))))
-                                       (cffi::foreign-pointer-type
-                                        `(%make-cpointer
-                                          :pointer ,slot-value
-                                          :shared-from ,instance
-                                          :element-type ',(cobject-class-definition-class
-                                                           (find-cobject-class-definition
-                                                            (cffi::ensure-parsed-base-type
-                                                             (cffi::pointer-type slot-type))))))
-                                       (t slot-value)))
-                                  (declaim (inline (setf ,slot-accessor)))
+                                    ,(flet ((access-simple-slot ()
+                                              (typecase slot-type
+                                                (cffi::foreign-struct-type
+                                                 `(,(cobject-class-definition-internal-constructor
+                                                     (find-cobject-class-definition slot-type))
+                                                   :pointer ,slot-pointer
+                                                   :shared-from ,instance))
+                                                (cffi::foreign-array-type
+                                                 `(%make-carray
+                                                   :pointer ,slot-pointer
+                                                   :shared-from ,instance
+                                                   :dimensions ',(cffi::dimensions slot-type)
+                                                   :element-type ',(cobject-class-definition-class
+                                                                    (find-cobject-class-definition
+                                                                     (cffi::ensure-parsed-base-type
+                                                                      (cffi::element-type slot-type))))))
+                                                (cffi::foreign-pointer-type
+                                                 `(%make-cpointer
+                                                   :pointer ,slot-value
+                                                   :shared-from ,instance
+                                                   :element-type ',(cobject-class-definition-class
+                                                                    (find-cobject-class-definition
+                                                                     (cffi::ensure-parsed-base-type
+                                                                      (cffi::pointer-type slot-type))))))
+                                                (t slot-value))))
+                                       (etypecase slot
+                                         (cffi::aggregate-struct-slot
+                                          (case (cffi::slot-count slot)
+                                            (0 `(%make-cpointer
+                                                 :pointer ,slot-pointer
+                                                 :shared-from ,instance
+                                                 :element-type ',(cobject-class-definition-class (find-cobject-class-definition slot-type))))
+                                            (1 (access-simple-slot))
+                                            (t `(%make-carray
+                                                 :pointer ,slot-pointer
+                                                 :shared-from ,instance
+                                                 :dimensions '(,(cffi::slot-count slot))
+                                                 :element-type ',(cobject-class-definition-class (find-cobject-class-definition slot-type))))))
+                                         (cffi::simple-struct-slot (access-simple-slot))))))
+                         :nconc `((declaim (inline (setf ,slot-accessor)))
                                   (defun (setf ,slot-accessor) (,value ,instance)
-                                    ,(typecase slot-type
-                                       (cffi::foreign-struct-type
-                                        `(memcpy ,slot-pointer (cobject-pointer ,value) (cffi:foreign-type-size ',slot-type)))
-                                       (cffi::foreign-array-type
-                                        `(creplace (,slot-accessor ,instance) ,value))
-                                       (cffi::foreign-pointer-type
-                                        `(setf ,slot-value (cobject-pointer ,value)))
-                                       (t `(setf ,slot-value ,value))))))
+                                    ,(flet ((access-simple-slot ()
+                                              (typecase slot-type
+                                                (cffi::foreign-struct-type
+                                                 `(memcpy ,slot-pointer (cobject-pointer ,value) (cffi:foreign-type-size ',slot-type)))
+                                                (cffi::foreign-array-type
+                                                 `(creplace (,slot-accessor ,instance) ,value))
+                                                (cffi::foreign-pointer-type
+                                                 `(setf ,slot-value (cobject-pointer ,value)))
+                                                (t `(setf ,slot-value ,value)))))
+                                       (etypecase slot
+                                         (cffi::aggregate-struct-slot
+                                          (case (cffi::slot-count slot)
+                                            (1 (access-simple-slot))
+                                            (t `(creplace (,slot-accessor ,instance) ,value))))
+                                         (cffi::simple-struct-slot
+                                          (access-simple-slot)))))))
                  (declaim (inline ,in-place-constructor))
                  (defun ,in-place-constructor (,pointer &key . ,(mapcar #'list slots (mapcar (constantly nil) slots) slot-supplied-p-list))
                    (let ((,instance (,internal-constructor :pointer ,pointer)))

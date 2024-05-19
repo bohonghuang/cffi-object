@@ -99,9 +99,9 @@
                      (cffi::foreign-string-type 'string)
                      (cffi::foreign-array-type
                       `(carray ,(cobject-class-definition-class
-                                 (find-cobject-class-definition (cffi::element-type type)))
+                                 (find-cobject-class-definition (cffi::ensure-parsed-base-type (cffi::element-type type))))
                                ,(cffi::dimensions type)))
                      (cffi::foreign-pointer-type
                       `(cpointer ,(cobject-class-definition-class
-                                   (find-cobject-class-definition (cffi::pointer-type type)))))
+                                   (find-cobject-class-definition (cffi::ensure-parsed-base-type (cffi::pointer-type type))))))
                      (t (error 'cobject-class-definition-not-found-error :type type))))))))
