@@ -339,3 +339,28 @@
   (define-test readable-complex-cobject
     (let ((camera-2d (make-camera-2d)))
       (is camera-2d-equal camera-2d (read-from-string (prin1-to-string camera-2d))))))
+
+(defcstruct aggregate-struct
+  (a (:array :uint8 3) :count 0)
+  (b (:array :uint8 1) :count 1)
+  (c :uint8 :count 2))
+
+(define-cobject-class (:struct aggregate-struct))
+
+(defvar *aggregate-struct* nil)
+
+(define-test aggregate-struct-slot :parent suite :fix (*aggregate-struct*)
+  (setf *aggregate-struct* (make-aggregate-struct :b (make-carray 1 :element-type '(unsigned-byte 8) :initial-contents '(1))
+                                                  :c (make-carray 2 :element-type '(unsigned-byte 8) :initial-contents '(2 3))))
+  (define-test count=0
+    (of-type cpointer (aggregate-struct-a *aggregate-struct*))
+    (is carray-equal (make-carray 3 :element-type '(unsigned-byte 8) :initial-contents '(1 2 3)) (cref (aggregate-struct-a *aggregate-struct*)))
+    (fail (setf (aggregate-struct-a *aggregate-struct*) (make-carray 3 :element-type '(unsigned-byte 8) :initial-contents '(1 2 3)))))
+  (define-test count=1
+    (of-type carray (aggregate-struct-b *aggregate-struct*))
+    (is equal '(unsigned-byte 8) (carray-element-type (aggregate-struct-b *aggregate-struct*)))
+    (is carray-equal (make-carray 1 :element-type '(unsigned-byte 8) :initial-contents '(1)) (aggregate-struct-b *aggregate-struct*)))
+  (define-test count=2
+    (of-type carray (aggregate-struct-c *aggregate-struct*))
+    (is equal '(unsigned-byte 8) (carray-element-type (aggregate-struct-b *aggregate-struct*)))
+    (is carray-equal (make-carray 2 :element-type '(unsigned-byte 8) :initial-contents '(2 3)) (aggregate-struct-c *aggregate-struct*))))
