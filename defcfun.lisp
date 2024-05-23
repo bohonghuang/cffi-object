@@ -5,7 +5,7 @@
 
 (defun cffi-object-type-p (type)
   (when-let ((type (cffi-pointer-type-p type)))
-    (and (typep (setf type (cffi::ensure-parsed-base-type (cffi::pointer-type type))) 'cffi::foreign-struct-type) type)))
+    (and (typep (setf type (cffi::ensure-parsed-base-type (cffi-pointer-type type))) 'cffi::foreign-struct-type) type)))
 
 (defparameter *return-argument-names* '(#:%%claw-result-))
 
@@ -80,7 +80,7 @@
                                                :collect `(push (cons nil (compose (lambda (,body) `(let ((,(assoc-value ,temp-vars ',name) ,,name)) . ,,body)) #'list)) ,dynamic-extent-forms))
                                      (nreversef ,dynamic-extent-forms)
                                      (lambda (,(caar args) ,body)
-                                       `(cffi:with-foreign-object (,,(caar args) ',',(cffi::pointer-type (cffi::ensure-parsed-base-type (cadar args))))
+                                       `(cffi:with-foreign-object (,,(caar args) ',',(cffi-pointer-type (cffi::ensure-parsed-base-type (cadar args))))
                                           ,(reduce #'funcall ,(if *optimize-out-temporary-object-p*
                                                                   `(loop :for (,name . ,form) :in ,dynamic-extent-forms
                                                                          :if ,name
@@ -122,8 +122,8 @@
                                 (return-pointer-from-result-p `(pointer-cpointer ,result ',(or (ignore-some-conditions (cobject-class-definition-not-found-error)
                                                                                                  (cobject-class-definition-class
                                                                                                   (find-cobject-class-definition
-                                                                                                   (cffi::pointer-type return-pointer-from-result-p))))
-                                                                                               (cffi::name (cffi::pointer-type return-pointer-from-result-p)))))
+                                                                                                   (cffi-pointer-type return-pointer-from-result-p))))
+                                                                                               (cffi::name (cffi-pointer-type return-pointer-from-result-p)))))
                                 (t result))))))
                   `(progn
                      (defun ,symbol ,(mapcar #'car args)

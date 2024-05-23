@@ -364,3 +364,21 @@
     (of-type carray (aggregate-struct-c *aggregate-struct*))
     (is equal '(unsigned-byte 8) (carray-element-type (aggregate-struct-b *aggregate-struct*)))
     (is carray-equal (make-carray 2 :element-type '(unsigned-byte 8) :initial-contents '(2 3)) (aggregate-struct-c *aggregate-struct*))))
+
+(defcstruct void-pointer-struct
+  (a :pointer)
+  (b (:pointer :pointer))
+  (c (:pointer :void))
+  (d (:pointer (:pointer :void))))
+
+(define-cobject-class (:struct void-pointer-struct))
+
+(define-test void-pointer :parent suite
+  (let* ((carray (make-carray 1 :element-type '(unsigned-byte 32) :initial-contents '(123456)))
+         (cpointer (make-carray 1 :element-type '(cpointer (unsigned-byte 32)) :initial-contents (list carray))))
+    (is = 123456 (cref (cref cpointer)))
+    (let ((struct (make-void-pointer-struct :a carray :b cpointer :c carray :d cpointer)))
+      (is = 123456 (cref (pointer-cpointer (cobject-pointer (void-pointer-struct-a struct)) '(unsigned-byte 32))))
+      (is = 123456 (cref (cref (pointer-cpointer (cobject-pointer (void-pointer-struct-b struct)) '(cpointer (unsigned-byte 32))))))
+      (is = 123456 (cref (pointer-cpointer (cobject-pointer (void-pointer-struct-c struct)) '(unsigned-byte 32))))
+      (is = 123456 (cref (cref (pointer-cpointer (cobject-pointer (void-pointer-struct-d struct)) '(cpointer (unsigned-byte 32)))))))))
