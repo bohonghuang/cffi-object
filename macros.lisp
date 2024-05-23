@@ -95,7 +95,6 @@
                                                 (cffi::foreign-pointer-type
                                                  `(%make-cpointer
                                                    :pointer ,slot-value
-                                                   :shared-from ,instance
                                                    :element-type ',(cobject-class-definition-class
                                                                     (find-cobject-class-definition
                                                                      (cffi::ensure-parsed-base-type
