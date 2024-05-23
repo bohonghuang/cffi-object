@@ -38,3 +38,8 @@
       (or (type= type1 type2)
           (and (symbolp type1) (symbolp type2)
                (eql (find-class type1 nil) (find-class type2 nil))))))
+
+(setf (fdefinition 'cffi-element-type) (fdefinition 'cffi::element-type))
+
+(defun cffi-pointer-type (type)
+  (or (cffi::pointer-type type) :void))

@@ -91,7 +91,7 @@
                                                    :element-type ',(cobject-class-definition-class
                                                                     (find-cobject-class-definition
                                                                      (cffi::ensure-parsed-base-type
-                                                                      (cffi::element-type slot-type))))))
+                                                                      (cffi-element-type slot-type))))))
                                                 (cffi::foreign-pointer-type
                                                  `(%make-cpointer
                                                    :pointer ,slot-value
@@ -99,7 +99,7 @@
                                                    :element-type ',(cobject-class-definition-class
                                                                     (find-cobject-class-definition
                                                                      (cffi::ensure-parsed-base-type
-                                                                      (cffi::pointer-type slot-type))))))
+                                                                      (cffi-pointer-type slot-type))))))
                                                 (t slot-value))))
                                        (etypecase slot
                                          (cffi::aggregate-struct-slot
@@ -236,7 +236,7 @@
                                           (when (typep (cffi::actual-type type) 'cffi::foreign-struct-type)
                                             (push `(define-type-cobject-class (,name ,type)) definitions)))
                                          (cffi::foreign-pointer-type
-                                          (push-definition (cffi::pointer-type type)))
+                                          (push-definition (cffi-pointer-type type)))
                                          (cffi::foreign-struct-type
                                           (mapc (compose #'push-definition #'cffi::parse-type #'cffi::slot-type)
                                                 (hash-table-values (cffi::slots type)))
