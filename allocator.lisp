@@ -1,5 +1,6 @@
 (in-package #:cffi-object)
 
+(declaim (inline make-cobject-allocator))
 (defstruct cobject-allocator
   (allocator (constantly (cffi:null-pointer)) :type (function (cffi::foreign-type) (values cffi:foreign-pointer)))
   (deallocator #'values :type (function (cffi:foreign-pointer))))
@@ -11,6 +12,16 @@
 
 (declaim (type cobject-allocator *cobject-allocator*))
 (defparameter *cobject-allocator* *default-cobject-allocator*)
+
+(declaim (inline make-leaky-allocator))
+(defun make-leaky-allocator (&key (allocator (cobject-allocator-allocator *cobject-allocator*)) (deallocator #'values))
+  (make-cobject-allocator :allocator allocator :deallocator deallocator))
+
+(defmacro with-leaky-allocator (&body body)
+  (with-gensyms (allocator)
+    `(let ((,allocator (make-leaky-allocator)))
+       (declare (dynamic-extent ,allocator))
+       (let ((*cobject-allocator* ,allocator)) . ,body))))
 
 (declaim (inline %make-sized-monotonic-buffer-allocator))
 (defstruct (sized-monotonic-buffer-allocator (:include cobject-allocator) (:constructor %make-sized-monotonic-buffer-allocator))
