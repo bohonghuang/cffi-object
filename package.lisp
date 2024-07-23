@@ -30,6 +30,7 @@
            #:unmanage-cobject
            #:with-monotonic-buffer-allocator
            #:with-default-allocator
+           #:with-leaky-allocator
            #:defcobjfun))
 
 (in-package #:cffi-object)
