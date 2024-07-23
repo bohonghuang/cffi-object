@@ -14,6 +14,7 @@
                (:file "definition")
                (:file "allocator")
                (:file "object")
+               (:file "allocator-ecl" :if-feature :ecl)
                (:file "pointer")
                (:file "array")
                (:file "macros")
