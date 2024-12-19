@@ -104,4 +104,6 @@
                      (cffi::foreign-pointer-type
                       `(cpointer ,(cobject-class-definition-class
                                    (find-cobject-class-definition (cffi::ensure-parsed-base-type (cffi-pointer-type type))))))
+                     (cffi::foreign-enum
+                      `(unsigned-byte ,(* (cffi:foreign-type-size (cffi::ensure-parsed-base-type :unsigned-int)))))
                      (t (error 'cobject-class-definition-not-found-error :type type))))))))
