@@ -37,6 +37,19 @@
               (intern (format nil "~A~A" '#:%%%make- type-name) (symbol-package type-name)))
       (error "Defining a C function that returns non-structure pointer is currently not supported."))))
 
+(defun frob-return-pointer-from-result (return-pointer-from-result-p result)
+  (labels ((resolve (return-pointer-from-result-p)
+             (if (not (cffi-pointer-type-p (cffi-pointer-type return-pointer-from-result-p)))
+                 (or (ignore-some-conditions (cobject-class-definition-not-found-error)
+                       (cobject-class-definition-class
+                        (find-cobject-class-definition
+                         (cffi-pointer-type return-pointer-from-result-p))))
+                     (cffi::name (cffi-pointer-type return-pointer-from-result-p)))
+                 `(:pointer ,(resolve (cffi-pointer-type return-pointer-from-result-p))))))
+    `(pointer-cpointer ,result
+                       ',(resolve
+                          return-pointer-from-result-p))))
+
 (defmacro defcobjfun (name result &rest args)
   (destructuring-bind (name symbol) name
     (let* ((should-define-wrapper-p (not (member '&rest args)))
@@ -119,11 +132,8 @@
                                 ((and return-object-from-result-p *return-pointer-as-object-p*)
                                  (let ((internal-constructor (nth-value 2 (cobject-type-constructor return-object-from-result-p))))
                                    `(locally (declare (notinline ,internal-constructor)) (,internal-constructor :pointer ,result))))
-                                (return-pointer-from-result-p `(pointer-cpointer ,result ',(or (ignore-some-conditions (cobject-class-definition-not-found-error)
-                                                                                                 (cobject-class-definition-class
-                                                                                                  (find-cobject-class-definition
-                                                                                                   (cffi-pointer-type return-pointer-from-result-p))))
-                                                                                               (cffi::name (cffi-pointer-type return-pointer-from-result-p)))))
+                                (return-pointer-from-result-p
+                                 (frob-return-pointer-from-result return-pointer-from-result-p result))
                                 (t result))))))
                   `(progn
                      (defun ,symbol ,(mapcar #'car args)
