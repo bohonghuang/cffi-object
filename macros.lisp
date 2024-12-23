@@ -237,8 +237,12 @@
                                          (cffi::foreign-pointer-type
                                           (push-definition (cffi-pointer-type type)))
                                          (cffi::foreign-struct-type
-                                          (mapc (compose #'push-definition #'cffi::parse-type #'cffi::slot-type)
-                                                (hash-table-values (cffi::slots type)))
+                                          (loop for slot in (hash-table-values (cffi::slots type))
+                                                for slot-type = (cffi::slot-type slot)
+                                                for parsed-slot-type = (cffi::ensure-parsed-base-type slot-type)
+                                                do (etypecase parsed-slot-type
+                                                     (cffi::foreign-pointer-type (push-definition (cffi-pointer-type parsed-slot-type)))
+                                                     (t (push-definition parsed-slot-type))))
                                           (push `(define-struct-cobject-class (,name ,type)) definitions)))
                                   (setf (gethash type type-set) t))))))
                     (ignore-some-conditions (warning) (push-definition (funcall type-getter)))))
