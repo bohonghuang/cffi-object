@@ -8,16 +8,12 @@
         :for cobject := (symbol-value name)
         :for type := (cobject-type (symbol-value name))
         :for (definition ctype) := (multiple-value-list (cobject-class-definition type))
-        :for constructor := (cobject-class-definition-constructor definition)
+        :for constructor := (cobject-class-definition-internal-constructor definition)
         :for size := (cffi:foreign-type-size ctype)
         :nconc (ccoerce (pointer-carray (cobject-pointer cobject) '(unsigned-byte 8) size) 'list) :into data
-        :collect (let ((constructor (ensure-function constructor)) (size size)
-                       (offset offset) (symbol name))
-                   (lambda (bytes)
-                     (let ((cobject (funcall constructor)))
-                       (cffi:with-pointer-to-vector-data (pointer bytes)
-                         (memcpy (cobject-pointer cobject) (cffi:inc-pointer pointer offset) size))
-                       (setf (symbol-value symbol) cobject))))
+        :collect (let ((constructor (ensure-function constructor)) (offset offset) (symbol name))
+                   (lambda (carray)
+                     (setf (symbol-value symbol) (funcall constructor :pointer (cffi:inc-pointer (carray-pointer carray) offset) :shared-from carray))))
           :into initializers
         :sum size :into offset
         :finally (return (values (replace (cffi:make-shareable-byte-vector offset) data) initializers))))
@@ -33,8 +29,9 @@
   (multiple-value-bind (bytes initializers) (global-cobjects-bytes)
     (setf *global-cobject-initializer*
           (lambda ()
-            (loop :for initializer :in initializers
-                  :do (funcall initializer bytes))))))
+            (loop :with carray := (make-carray (length bytes) :element-type '(unsigned-byte 8) :initial-contents bytes)
+                  :for initializer :in initializers
+                  :do (funcall initializer carray))))))
 
 (pushnew 'save-global-cobjects uiop:*image-dump-hook*)
 
